@@ -53,6 +53,7 @@ namespace FineRoadTool
         private NetInfo m_current;
         private NetInfo m_elevated;
         private NetInfo m_bridge;
+        private NetInfo m_tunnel;
         private RoadAI m_roadAI;
         private Mode m_mode;
 
@@ -102,11 +103,13 @@ namespace FineRoadTool
 
             if(prefab != m_current)
             {
-                m_tool.m_elevationDivider = 1024;
                 RestorePrefab();
                 m_current = prefab;
                 StorePrefab();
                 UpdatePrefab();
+
+
+                if (m_current != null) m_tool.m_elevationDivider = (m_roadAI != null) ? 1024 : 1;
 
                 //try
                 //{
@@ -206,7 +209,7 @@ namespace FineRoadTool
 
         private void UpdateElevation()
         {
-            m_tool.m_elevationDivider = 1024;
+            //m_tool.m_elevationDivider = 1024;
 
             int min, max;
             m_roadAI.GetElevationLimits(out min, out max);
@@ -226,6 +229,7 @@ namespace FineRoadTool
 
             m_elevated = m_roadAI.m_elevatedInfo;
             m_bridge = m_roadAI.m_bridgeInfo;
+            m_tunnel = m_roadAI.m_tunnelInfo;
         }
 
         private void RestorePrefab()
@@ -235,6 +239,7 @@ namespace FineRoadTool
             m_roadAI.m_info = m_current;
             m_roadAI.m_elevatedInfo = m_elevated;
             m_roadAI.m_bridgeInfo = m_bridge;
+            m_roadAI.m_tunnelInfo = m_tunnel;
         }
 
         private void UpdatePrefab()
@@ -247,21 +252,52 @@ namespace FineRoadTool
                     m_roadAI.m_info = m_current;
                     m_roadAI.m_elevatedInfo = m_elevated;
                     m_roadAI.m_bridgeInfo = m_bridge;
+                    m_roadAI.m_tunnelInfo = m_tunnel;
                     break;
                 case Mode.Ground:
                     m_roadAI.m_info = m_current;
                     m_roadAI.m_elevatedInfo = m_current;
                     m_roadAI.m_bridgeInfo = null;
+                    m_roadAI.m_tunnelInfo = m_current;
                     break;
                 case Mode.Elevated:
-                    m_roadAI.m_info = m_elevated;
-                    m_roadAI.m_elevatedInfo = m_elevated;
-                    m_roadAI.m_bridgeInfo = null;
+                    if (m_elevated != null)
+                    {
+                        m_roadAI.m_info = m_elevated;
+                        m_roadAI.m_elevatedInfo = m_elevated;
+                        m_roadAI.m_bridgeInfo = null;
+                        m_roadAI.m_tunnelInfo = m_tunnel;
+                    }
+                    else
+                    {
+                        m_roadAI.m_info = m_current;
+                        m_roadAI.m_elevatedInfo = m_current;
+                        m_roadAI.m_bridgeInfo = null;
+                        m_roadAI.m_tunnelInfo = m_tunnel;
+                    }
                     break;
                 case Mode.Bridge:
-                    m_roadAI.m_info = m_bridge;
-                    m_roadAI.m_elevatedInfo = null;
-                    m_roadAI.m_bridgeInfo = m_bridge;
+                    if (m_bridge != null)
+                    {
+                        m_roadAI.m_info = m_bridge;
+                        m_roadAI.m_elevatedInfo = null;
+                        m_roadAI.m_bridgeInfo = m_bridge;
+                        m_roadAI.m_tunnelInfo = m_tunnel;
+                    }
+                    if (m_elevated != null)
+                    {
+                        m_roadAI.m_info = m_elevated;
+                        m_roadAI.m_elevatedInfo = null;
+                        m_roadAI.m_bridgeInfo = m_elevated;
+                        m_roadAI.m_tunnelInfo = m_tunnel;
+                    }
+                    else
+                    {
+                        m_roadAI.m_info = m_current;
+                        m_roadAI.m_elevatedInfo = null;
+                        m_roadAI.m_bridgeInfo = m_current;
+                        m_roadAI.m_tunnelInfo = m_tunnel;
+                    }
                     break;
             }
         }
