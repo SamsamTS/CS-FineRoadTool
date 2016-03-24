@@ -54,6 +54,7 @@
     <Compile Include="DebugUtils.cs" />
     <Compile Include="FineRoadTool.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="RoadAIWrapper.cs" />
   </ItemGroup>
   <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />

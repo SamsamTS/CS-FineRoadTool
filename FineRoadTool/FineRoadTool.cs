@@ -2,16 +2,10 @@
 using UnityEngine;
 
 using System;
-using System.Text;
-using System.Collections;
-using System.Collections.Generic;
-using System.IO;
 using System.Reflection;
 
 using ColossalFramework;
-using ColossalFramework.Threading;
 using ColossalFramework.UI;
-using ColossalFramework.Globalization;
 
 namespace FineRoadTool
 {
@@ -49,12 +43,16 @@ namespace FineRoadTool
 
         private FieldInfo m_elevationField;
 
+        #region Default value storage
         private NetTool m_tool;
         private NetInfo m_current;
         private NetInfo m_elevated;
         private NetInfo m_bridge;
+        private NetInfo m_slope;
         private NetInfo m_tunnel;
-        private RoadAI m_roadAI;
+        #endregion
+
+        private RoadAIWrapper m_roadAI;
         private Mode m_mode;
 
         private UILabel m_label;
@@ -69,78 +67,74 @@ namespace FineRoadTool
 
         public Mode mode
         {
+            get { return m_mode; }
             set
             {
-                if(value != m_mode)
+                if (value != m_mode)
                 {
                     m_mode = value;
                     UpdatePrefab();
                 }
             }
-
-            get { return m_mode; }
         }
 
         public void Start()
         {
             m_tool = GameObject.FindObjectOfType<NetTool>();
-            if(m_tool != null)
+            if (m_tool == null)
             {
-                DebugUtils.Log("Initialized");
+                DebugUtils.Log("NetTool not found.");
+                enabled = false;
+                return;
             }
 
-            m_elevationUp = new SavedInputKey(Settings.buildElevationUp, Settings.gameSettingsFile, DefaultSettings.buildElevationUp, true);
-            m_elevationDown = new SavedInputKey(Settings.buildElevationDown, Settings.gameSettingsFile, DefaultSettings.buildElevationDown, true);
-
             m_elevationField = m_tool.GetType().GetField("m_elevation", BindingFlags.NonPublic | BindingFlags.Instance);
+            if (m_elevationField == null)
+            {
+                DebugUtils.Log("NetTool m_elevation field not found");
+                m_tool = null;
+                enabled = false;
+                return;
+            }
+
+            try
+            {
+                m_elevationUp = m_tool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_tool) as SavedInputKey;
+                m_elevationDown = m_tool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_tool) as SavedInputKey;
+
+                m_tool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(m_tool, new SavedInputKey("", ""));
+                m_tool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(m_tool, new SavedInputKey("", ""));
+            }
+            catch(Exception e)
+            {
+                DebugUtils.Log("Couldn't disable NetTool elevation keys");
+                DebugUtils.LogException(e);
+                m_tool = null;
+                enabled = false;
+                return;
+            }
+
+            CreateLabel();
+
+            DebugUtils.Log("Initialized");
         }
 
         public void Update()
         {
             if (m_tool == null) return;
 
-            NetInfo prefab = m_tool.m_prefab as NetInfo;
+            NetInfo prefab = m_tool.m_prefab;
 
-            if(prefab != m_current)
+            if (prefab != m_current)
             {
+                m_label.isVisible = false;
                 RestorePrefab();
                 m_current = prefab;
+                if (m_current == null) return;
+
+                AttachLabel();
                 StorePrefab();
                 UpdatePrefab();
-
-
-                if (m_current != null) m_tool.m_elevationDivider = (m_roadAI != null) ? 1024 : 1;
-
-                //try
-                //{
-                    if (m_label == null)
-                    {
-                        UIMultiStateButton button = UIView.Find<UIPanel>("RoadsOptionPanel(RoadsPanel)").Find<UIMultiStateButton>("ElevationStep");
-
-                        if (button != null)
-                        {
-                            button.tooltip = "Ctrl + Up/Down : Change elevation step\nCtrl + Left/Right : Change mode";
-                            button.isInteractive = false;
-
-                            m_label = button.AddUIComponent<UILabel>();
-                            m_label.autoSize = false;
-                            m_label.size = button.size;
-                            m_label.position = Vector2.zero;
-                            m_label.textColor = Color.white;
-                            m_label.outlineColor = Color.black;
-                            m_label.outlineSize = 1;
-                            m_label.useOutline = true;
-                            m_label.backgroundSprite = "IconPolicyBaseCircleDisabled";
-
-                            m_label.textAlignment = UIHorizontalAlignment.Center;
-                            m_label.wordWrap = true;
-
-                            m_label.text = "3m\nNrm";
-                            m_label.Show(true);
-                        }
-                    }
-                //}
-                //catch { }
             }
         }
 
@@ -209,10 +203,8 @@ namespace FineRoadTool
 
         private void UpdateElevation()
         {
-            //m_tool.m_elevationDivider = 1024;
-
             int min, max;
-            m_roadAI.GetElevationLimits(out min, out max);
+            m_current.m_netAI.GetElevationLimits(out min, out max);
 
             m_elevation = Mathf.Clamp(m_elevation, min * 256, max * 256);
             if (m_elevationStep < 3) m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_elevation / (256f / 12f)) * (256f / 12f));
@@ -224,82 +216,103 @@ namespace FineRoadTool
         {
             if (m_current == null) return;
 
-            m_roadAI = m_current.m_netAI as RoadAI;
-            if (m_roadAI == null) return;
+            m_roadAI = new RoadAIWrapper(m_current.m_netAI);
+            if (!m_roadAI.hasElevation) return;
 
-            m_elevated = m_roadAI.m_elevatedInfo;
-            m_bridge = m_roadAI.m_bridgeInfo;
-            m_tunnel = m_roadAI.m_tunnelInfo;
+            m_elevated = m_roadAI.elevated;
+            m_bridge = m_roadAI.bridge;
+            m_slope = m_roadAI.slope;
+            m_tunnel = m_roadAI.tunnel;
         }
 
         private void RestorePrefab()
         {
-            if (m_current == null || m_roadAI == null) return;
+            if (m_current == null || !m_roadAI.hasElevation) return;
 
-            m_roadAI.m_info = m_current;
-            m_roadAI.m_elevatedInfo = m_elevated;
-            m_roadAI.m_bridgeInfo = m_bridge;
-            m_roadAI.m_tunnelInfo = m_tunnel;
+            m_roadAI.info = m_current;
+            m_roadAI.elevated = m_elevated;
+            m_roadAI.bridge = m_bridge;
+            m_roadAI.slope = m_slope;
+            m_roadAI.tunnel = m_tunnel;
         }
 
         private void UpdatePrefab()
         {
-            if (m_current == null || m_roadAI == null) return;
+            if (m_current == null || !m_roadAI.hasElevation) return;
 
-            switch(m_mode)
+            RestorePrefab();
+
+            switch (m_mode)
             {
-                case Mode.Normal:
-                    m_roadAI.m_info = m_current;
-                    m_roadAI.m_elevatedInfo = m_elevated;
-                    m_roadAI.m_bridgeInfo = m_bridge;
-                    m_roadAI.m_tunnelInfo = m_tunnel;
-                    break;
                 case Mode.Ground:
-                    m_roadAI.m_info = m_current;
-                    m_roadAI.m_elevatedInfo = m_current;
-                    m_roadAI.m_bridgeInfo = null;
-                    m_roadAI.m_tunnelInfo = m_current;
+                    m_roadAI.elevated = m_current;
+                    m_roadAI.bridge = null;
+                    m_roadAI.slope = m_current;
+                    m_roadAI.tunnel = m_current;
                     break;
                 case Mode.Elevated:
                     if (m_elevated != null)
                     {
-                        m_roadAI.m_info = m_elevated;
-                        m_roadAI.m_elevatedInfo = m_elevated;
-                        m_roadAI.m_bridgeInfo = null;
-                        m_roadAI.m_tunnelInfo = m_tunnel;
-                    }
-                    else
-                    {
-                        m_roadAI.m_info = m_current;
-                        m_roadAI.m_elevatedInfo = m_current;
-                        m_roadAI.m_bridgeInfo = null;
-                        m_roadAI.m_tunnelInfo = m_tunnel;
+                        m_roadAI.info = m_elevated;
+                        m_roadAI.elevated = m_elevated;
+                        m_roadAI.bridge = null;
                     }
                     break;
                 case Mode.Bridge:
                     if (m_bridge != null)
                     {
-                        m_roadAI.m_info = m_bridge;
-                        m_roadAI.m_elevatedInfo = null;
-                        m_roadAI.m_bridgeInfo = m_bridge;
-                        m_roadAI.m_tunnelInfo = m_tunnel;
-                    }
-                    if (m_elevated != null)
-                    {
-                        m_roadAI.m_info = m_elevated;
-                        m_roadAI.m_elevatedInfo = null;
-                        m_roadAI.m_bridgeInfo = m_elevated;
-                        m_roadAI.m_tunnelInfo = m_tunnel;
-                    }
-                    else
-                    {
-                        m_roadAI.m_info = m_current;
-                        m_roadAI.m_elevatedInfo = null;
-                        m_roadAI.m_bridgeInfo = m_current;
-                        m_roadAI.m_tunnelInfo = m_tunnel;
+                        m_roadAI.info = m_bridge;
+                        m_roadAI.elevated = null;
+                        m_roadAI.bridge = m_bridge;
                     }
                     break;
             }
+        }
+
+        private void CreateLabel()
+        {
+            if (m_label != null) return;
+
+            m_label = UIView.GetAView().AddUIComponent(typeof(UILabel)) as UILabel;
+
+            if (m_label == null)
+            {
+                DebugUtils.Log("Couldn't create label");
+                return;
+            }
+
+            m_label.autoSize = false;
+            m_label.size = new Vector2(36, 36);
+            m_label.position = Vector2.zero;
+            m_label.textColor = Color.white;
+            m_label.outlineColor = Color.black;
+            m_label.outlineSize = 1;
+            m_label.useOutline = true;
+            m_label.backgroundSprite = "OptionBaseDisabled";
+
+            m_label.textAlignment = UIHorizontalAlignment.Center;
+            m_label.wordWrap = true;
+
+            m_label.text = "3m\nNrm";
+            m_label.tooltip = "Ctrl + Up/Down : Change elevation step\nCtrl + Left/Right : Change mode";
+            m_label.isVisible = false;
+        }
+
+        private void AttachLabel()
+        {
+            UIPanel optionBar = UIView.Find<UIPanel>("OptionsBar");
+
+            foreach(UIComponent panel in optionBar.components)
+            {
+                if(panel.isVisible)
+                {
+                    DebugUtils.Log("Found panel");
+                    m_label.transform.SetParent(panel.Find<UIMultiStateButton>("ElevationStep").transform, false);
+                    m_label.isVisible = true;
+                    return;
+                }
+            }
+            m_label.isVisible = false;
         }
     }
 }

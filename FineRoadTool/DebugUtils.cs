@@ -27,7 +27,7 @@ namespace FineRoadTool
             {
                 m_duplicates++;
             }
-            else if(m_duplicates > 0)
+            else if (m_duplicates > 0)
             {
                 Debug.Log(modPrefix + "(x" + (m_duplicates + 1) + ")");
                 Debug.Log(modPrefix + message);
