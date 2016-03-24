@@ -97,8 +97,22 @@ namespace FineRoadTool
                 return;
             }
 
-            m_elevationUp = new SavedInputKey(Settings.buildElevationUp, Settings.gameSettingsFile, DefaultSettings.buildElevationUp, true);
-            m_elevationDown = new SavedInputKey(Settings.buildElevationDown, Settings.gameSettingsFile, DefaultSettings.buildElevationDown, true);
+            try
+            {
+                m_elevationUp = m_tool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_tool) as SavedInputKey;
+                m_elevationDown = m_tool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_tool) as SavedInputKey;
+
+                m_tool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(m_tool, new SavedInputKey("", Settings.gameSettingsFile));
+                m_tool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(m_tool, new SavedInputKey("", Settings.gameSettingsFile));
+            }
+            catch (Exception e)
+            {
+                DebugUtils.Log("Couldn't disable NetTool elevation keys");
+                DebugUtils.LogException(e);
+                m_tool = null;
+                enabled = false;
+                return;
+            }
 
             CreateLabel();
 
@@ -123,6 +137,7 @@ namespace FineRoadTool
                 AttachLabel();
                 StorePrefab();
                 UpdatePrefab();
+                UpdateElevation();
             }
         }
 
@@ -131,19 +146,32 @@ namespace FineRoadTool
             if (m_current == null || !m_tool.enabled) return;
 
             Event e = Event.current;
-            m_tool.m_elevationDivider = 1024;
+            //m_tool.m_elevationDivider = 1024;
 
             if (m_elevationUp.IsPressed(e))
             {
                 m_elevation += Mathf.RoundToInt(256f * m_elevationStep / 12f);
-                if (m_elevation < 0 && m_elevation > -256) m_elevation = 0;
-                UpdateElevation();
+                /*if (m_elevation < 0 && m_elevation > -256)
+                {
+                    if (!Detour.NetToolDetour.isDetoured)
+                        Detour.NetToolDetour.Detour(m_tool);
+                }
+                else
+                    Detour.NetToolDetour.Revert();*/
+
+                //UpdateElevation();
             }
             else if (m_elevationDown.IsPressed(e))
             {
                 m_elevation -= Mathf.RoundToInt(256f * m_elevationStep / 12f);
-                if (m_elevation < 0 && m_elevation > -256) m_elevation = -256;
-                UpdateElevation();
+                /*if (m_elevation < 0 && m_elevation > -256)
+                {
+                    if (!Detour.NetToolDetour.isDetoured)
+                        Detour.NetToolDetour.Detour(m_tool);
+                }
+                else
+                    Detour.NetToolDetour.Revert();*/
+                //UpdateElevation();
             }
             else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.UpArrow && e.control)
             {
@@ -175,6 +203,8 @@ namespace FineRoadTool
                 else
                     mode = Mode.Bridge;
             }
+
+            UpdateElevation();
 
             if (m_label != null)
             {

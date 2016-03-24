@@ -14,6 +14,6 @@ namespace FineRoadTool
             get { return "More road tool options"; }
         }
 
-        public const string version = "0.2.2";
+        public const string version = "0.3.0";
     }
 }
