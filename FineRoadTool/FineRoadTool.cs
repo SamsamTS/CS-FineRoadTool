@@ -97,22 +97,8 @@ namespace FineRoadTool
                 return;
             }
 
-            try
-            {
-                m_elevationUp = m_tool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_tool) as SavedInputKey;
-                m_elevationDown = m_tool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_tool) as SavedInputKey;
-
-                m_tool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(m_tool, new SavedInputKey("", ""));
-                m_tool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(m_tool, new SavedInputKey("", ""));
-            }
-            catch(Exception e)
-            {
-                DebugUtils.Log("Couldn't disable NetTool elevation keys");
-                DebugUtils.LogException(e);
-                m_tool = null;
-                enabled = false;
-                return;
-            }
+            m_elevationUp = new SavedInputKey(Settings.buildElevationUp, Settings.gameSettingsFile, DefaultSettings.buildElevationUp, true);
+            m_elevationDown = new SavedInputKey(Settings.buildElevationDown, Settings.gameSettingsFile, DefaultSettings.buildElevationDown, true);
 
             CreateLabel();
 
@@ -132,6 +118,8 @@ namespace FineRoadTool
                 m_current = prefab;
                 if (m_current == null) return;
 
+                DebugUtils.Log(m_tool.m_prefab.name + " selected");
+
                 AttachLabel();
                 StorePrefab();
                 UpdatePrefab();
@@ -143,6 +131,7 @@ namespace FineRoadTool
             if (m_current == null || !m_tool.enabled) return;
 
             Event e = Event.current;
+            m_tool.m_elevationDivider = 1024;
 
             if (m_elevationUp.IsPressed(e))
             {
@@ -158,11 +147,19 @@ namespace FineRoadTool
             }
             else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.UpArrow && e.control)
             {
-                if (m_elevationStep < 12) m_elevationStep++;
+                if (m_elevationStep < 12)
+                {
+                    m_elevationStep++;
+                    DebugUtils.Log("Elevation step set at " + m_elevationStep + "m");
+                }
             }
             else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.DownArrow && e.control)
             {
-                if (m_elevationStep > 1) m_elevationStep--;
+                if (m_elevationStep > 1)
+                {
+                    m_elevationStep--;
+                    DebugUtils.Log("Elevation step set at " + m_elevationStep + "m");
+                }
             }
             else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.RightArrow && e.control)
             {
@@ -244,11 +241,15 @@ namespace FineRoadTool
 
             switch (m_mode)
             {
+                case Mode.Normal:
+                    DebugUtils.Log("Normal mode activated");
+                    break;
                 case Mode.Ground:
                     m_roadAI.elevated = m_current;
                     m_roadAI.bridge = null;
                     m_roadAI.slope = m_current;
                     m_roadAI.tunnel = m_current;
+                    DebugUtils.Log("Ground mode activated");
                     break;
                 case Mode.Elevated:
                     if (m_elevated != null)
@@ -257,6 +258,7 @@ namespace FineRoadTool
                         m_roadAI.elevated = m_elevated;
                         m_roadAI.bridge = null;
                     }
+                    DebugUtils.Log("Elevated mode activated");
                     break;
                 case Mode.Bridge:
                     if (m_bridge != null)
@@ -265,6 +267,7 @@ namespace FineRoadTool
                         m_roadAI.elevated = null;
                         m_roadAI.bridge = m_bridge;
                     }
+                    DebugUtils.Log("Bridge mode activated");
                     break;
             }
         }
@@ -307,7 +310,13 @@ namespace FineRoadTool
                 if(panel.isVisible)
                 {
                     DebugUtils.Log("Found panel");
-                    m_label.transform.SetParent(panel.Find<UIMultiStateButton>("ElevationStep").transform, false);
+                    UIMultiStateButton button = panel.Find<UIMultiStateButton>("ElevationStep");
+                    if(button == null)
+                    {
+                        DebugUtils.Log("Warning: Button not found!");
+                        return;
+                    }
+                    m_label.transform.SetParent(button.transform, false);
                     m_label.isVisible = true;
                     return;
                 }
