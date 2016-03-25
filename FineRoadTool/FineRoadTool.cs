@@ -50,6 +50,7 @@ namespace FineRoadTool
         private NetInfo m_bridge;
         private NetInfo m_slope;
         private NetInfo m_tunnel;
+        private bool m_followTerrain;
         #endregion
 
         private RoadAIWrapper m_roadAI;
@@ -137,7 +138,8 @@ namespace FineRoadTool
                 AttachLabel();
                 StorePrefab();
                 UpdatePrefab();
-                UpdateElevation();
+                m_elevation = (int)m_elevationField.GetValue(m_tool);
+                //UpdateElevation();
             }
         }
 
@@ -147,6 +149,10 @@ namespace FineRoadTool
 
             Event e = Event.current;
             //m_tool.m_elevationDivider = 1024;
+            if (m_elevation >= 0 && m_elevation <= -256)
+                m_elevation = (int)m_elevationField.GetValue(m_tool);
+            else
+                UpdateElevation();
 
             if (m_elevationUp.IsPressed(e))
             {
@@ -159,7 +165,7 @@ namespace FineRoadTool
                 else
                     Detour.NetToolDetour.Revert();*/
 
-                //UpdateElevation();
+                UpdateElevation();
             }
             else if (m_elevationDown.IsPressed(e))
             {
@@ -171,7 +177,7 @@ namespace FineRoadTool
                 }
                 else
                     Detour.NetToolDetour.Revert();*/
-                //UpdateElevation();
+                UpdateElevation();
             }
             else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.UpArrow && e.control)
             {
@@ -204,8 +210,6 @@ namespace FineRoadTool
                     mode = Mode.Bridge;
             }
 
-            UpdateElevation();
-
             if (m_label != null)
             {
                 m_label.text = m_elevationStep + "m\n";
@@ -225,6 +229,9 @@ namespace FineRoadTool
                         m_label.text += "Bdg";
                         break;
                 }
+
+                int elevation = Mathf.RoundToInt(m_elevation / 256f * 12f);
+                m_label.text += "\n" + elevation + "m";
             }
         }
 
@@ -250,6 +257,7 @@ namespace FineRoadTool
             m_bridge = m_roadAI.bridge;
             m_slope = m_roadAI.slope;
             m_tunnel = m_roadAI.tunnel;
+            m_followTerrain = m_current.m_followTerrain;
         }
 
         private void RestorePrefab()
@@ -261,6 +269,7 @@ namespace FineRoadTool
             m_roadAI.bridge = m_bridge;
             m_roadAI.slope = m_slope;
             m_roadAI.tunnel = m_tunnel;
+            m_current.m_followTerrain = m_followTerrain;
         }
 
         private void UpdatePrefab()
@@ -277,8 +286,9 @@ namespace FineRoadTool
                 case Mode.Ground:
                     m_roadAI.elevated = m_current;
                     m_roadAI.bridge = null;
-                    m_roadAI.slope = m_current;
+                    m_roadAI.slope = null;
                     m_roadAI.tunnel = m_current;
+                    m_current.m_followTerrain = false;
                     DebugUtils.Log("Ground mode activated");
                     break;
                 case Mode.Elevated:
@@ -287,6 +297,7 @@ namespace FineRoadTool
                         m_roadAI.info = m_elevated;
                         m_roadAI.elevated = m_elevated;
                         m_roadAI.bridge = null;
+                        m_roadAI.tunnel = m_elevated;
                     }
                     DebugUtils.Log("Elevated mode activated");
                     break;
@@ -294,8 +305,8 @@ namespace FineRoadTool
                     if (m_bridge != null)
                     {
                         m_roadAI.info = m_bridge;
-                        m_roadAI.elevated = null;
-                        m_roadAI.bridge = m_bridge;
+                        m_roadAI.elevated = m_bridge;
+                        m_roadAI.tunnel = m_bridge;
                     }
                     DebugUtils.Log("Bridge mode activated");
                     break;
@@ -318,16 +329,16 @@ namespace FineRoadTool
             m_label.size = new Vector2(36, 36);
             m_label.position = Vector2.zero;
             m_label.textColor = Color.white;
-            m_label.outlineColor = Color.black;
-            m_label.outlineSize = 1;
-            m_label.useOutline = true;
+            m_label.textScale = 0.7f;
+            m_label.dropShadowOffset = new Vector2(2, -2);
+            m_label.useDropShadow = true;
             m_label.backgroundSprite = "OptionBaseDisabled";
 
             m_label.textAlignment = UIHorizontalAlignment.Center;
             m_label.wordWrap = true;
 
-            m_label.text = "3m\nNrm";
-            m_label.tooltip = "Ctrl + Up/Down : Change elevation step\nCtrl + Left/Right : Change mode";
+            m_label.text = "3m\nNrm\n0m";
+            m_label.tooltip = "Fine Road Tool " + ModInfo.version + "\nCtrl + Up/Down : Change elevation step\nCtrl + Left/Right : Change mode";
             m_label.isVisible = false;
         }
 
