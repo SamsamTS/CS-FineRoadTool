@@ -338,15 +338,10 @@ namespace FineRoadTool
 
             foreach (UIComponent panel in optionBar.components)
             {
-                if (panel.isVisible)
+                if (panel is UIPanel && panel.isVisible)
                 {
-                    DebugUtils.Log("Found panel");
                     UIMultiStateButton button = panel.Find<UIMultiStateButton>("ElevationStep");
-                    if (button == null)
-                    {
-                        DebugUtils.Log("Warning: Button not found!");
-                        return;
-                    }
+                    if (button == null) continue;
                     m_label.transform.SetParent(button.transform, false);
                     m_label.isVisible = true;
                     return;
