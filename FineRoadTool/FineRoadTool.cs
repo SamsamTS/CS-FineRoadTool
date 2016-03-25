@@ -12,14 +12,13 @@ namespace FineRoadTool
     public class FineRoadToolLoader : LoadingExtensionBase
     {
         private GameObject m_gameObject;
-        private FineRoadTool m_watcher;
 
         public override void OnLevelLoaded(LoadMode mode)
         {
             if (m_gameObject == null)
             {
                 m_gameObject = new GameObject("FineRoadTool");
-                m_watcher = m_gameObject.AddComponent<FineRoadTool>();
+                m_gameObject.AddComponent<FineRoadTool>();
             }
         }
 
@@ -35,8 +34,7 @@ namespace FineRoadTool
 
     public class FineRoadTool : MonoBehaviour
     {
-        private SavedInputKey m_elevationUp;
-        private SavedInputKey m_elevationDown;
+        public const string settingsFileName = "FineRoadTool";
 
         private int m_elevation = 0;
         private int m_elevationStep = 3;
@@ -57,6 +55,8 @@ namespace FineRoadTool
         private Mode m_mode;
 
         private UILabel m_label;
+
+        public static readonly SavedInt elevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
         public enum Mode
         {
@@ -100,9 +100,6 @@ namespace FineRoadTool
 
             try
             {
-                m_elevationUp = m_tool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_tool) as SavedInputKey;
-                m_elevationDown = m_tool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_tool) as SavedInputKey;
-
                 m_tool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(m_tool, new SavedInputKey("", Settings.gameSettingsFile));
                 m_tool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(m_tool, new SavedInputKey("", Settings.gameSettingsFile));
             }
@@ -114,6 +111,8 @@ namespace FineRoadTool
                 enabled = false;
                 return;
             }
+
+            m_elevationStep = elevationStep;
 
             CreateLabel();
 
@@ -139,7 +138,6 @@ namespace FineRoadTool
                 StorePrefab();
                 UpdatePrefab();
                 m_elevation = (int)m_elevationField.GetValue(m_tool);
-                //UpdateElevation();
             }
         }
 
@@ -148,66 +146,58 @@ namespace FineRoadTool
             if (m_current == null || !m_tool.enabled) return;
 
             Event e = Event.current;
-            //m_tool.m_elevationDivider = 1024;
+
             if (m_elevation >= 0 && m_elevation <= -256)
                 m_elevation = (int)m_elevationField.GetValue(m_tool);
             else
                 UpdateElevation();
 
-            if (m_elevationUp.IsPressed(e))
+            if (OptionsPanel.elevationUp.IsPressed(e))
             {
                 m_elevation += Mathf.RoundToInt(256f * m_elevationStep / 12f);
-                /*if (m_elevation < 0 && m_elevation > -256)
-                {
-                    if (!Detour.NetToolDetour.isDetoured)
-                        Detour.NetToolDetour.Detour(m_tool);
-                }
-                else
-                    Detour.NetToolDetour.Revert();*/
-
                 UpdateElevation();
             }
-            else if (m_elevationDown.IsPressed(e))
+            else if (OptionsPanel.elevationDown.IsPressed(e))
             {
                 m_elevation -= Mathf.RoundToInt(256f * m_elevationStep / 12f);
-                /*if (m_elevation < 0 && m_elevation > -256)
-                {
-                    if (!Detour.NetToolDetour.isDetoured)
-                        Detour.NetToolDetour.Detour(m_tool);
-                }
-                else
-                    Detour.NetToolDetour.Revert();*/
                 UpdateElevation();
             }
-            else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.UpArrow && e.control)
+            else if (OptionsPanel.elevationStepUp.IsPressed(e))
             {
                 if (m_elevationStep < 12)
                 {
                     m_elevationStep++;
+                    elevationStep.value = m_elevationStep;
                     DebugUtils.Log("Elevation step set at " + m_elevationStep + "m");
                 }
             }
-            else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.DownArrow && e.control)
+            else if (OptionsPanel.elevationStepDown.IsPressed(e))
             {
                 if (m_elevationStep > 1)
                 {
                     m_elevationStep--;
+                    elevationStep.value = m_elevationStep;
                     DebugUtils.Log("Elevation step set at " + m_elevationStep + "m");
                 }
             }
-            else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.RightArrow && e.control)
+            else if (OptionsPanel.modesCycleRight.IsPressed(e))
             {
                 if (m_mode < Mode.Bridge)
                     mode++;
                 else
                     mode = Mode.Normal;
             }
-            else if (e.type == EventType.KeyDown && e.keyCode == KeyCode.LeftArrow && e.control)
+            else if (OptionsPanel.modesCycleLeft.IsPressed(e))
             {
                 if (m_mode > Mode.Normal)
                     mode--;
                 else
                     mode = Mode.Bridge;
+            }
+            else if (OptionsPanel.elevationReset.IsPressed(e))
+            {
+                m_elevation = 0;
+                UpdateElevation();
             }
 
             if (m_label != null)
@@ -346,13 +336,13 @@ namespace FineRoadTool
         {
             UIPanel optionBar = UIView.Find<UIPanel>("OptionsBar");
 
-            foreach(UIComponent panel in optionBar.components)
+            foreach (UIComponent panel in optionBar.components)
             {
-                if(panel.isVisible)
+                if (panel.isVisible)
                 {
                     DebugUtils.Log("Found panel");
                     UIMultiStateButton button = panel.Find<UIMultiStateButton>("ElevationStep");
-                    if(button == null)
+                    if (button == null)
                     {
                         DebugUtils.Log("Warning: Button not found!");
                         return;
