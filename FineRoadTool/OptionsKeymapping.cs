@@ -9,7 +9,7 @@ using ColossalFramework.UI;
 
 namespace FineRoadTool
 {
-    class OptionsPanel : OptionsKeymappingPanel
+    class OptionsKeymapping : OptionsKeymappingPanel
     {
         public static readonly SavedInputKey elevationUp = new SavedInputKey(Settings.buildElevationUp, Settings.gameSettingsFile, DefaultSettings.buildElevationUp, true);
         public static readonly SavedInputKey elevationDown = new SavedInputKey(Settings.buildElevationDown, Settings.gameSettingsFile, DefaultSettings.buildElevationDown, true);
@@ -49,5 +49,4 @@ namespace FineRoadTool
             uIButton.objectUserData = savedInputKey;
         }
     }
-
 }

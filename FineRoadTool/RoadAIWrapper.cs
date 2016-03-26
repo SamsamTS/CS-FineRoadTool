@@ -32,7 +32,7 @@ namespace FineRoadTool
 
         public bool hasElevation
         {
-            get { return m_elevated != null && m_bridge != null && m_tunnel != null; }
+            get { return m_elevated != null && m_bridge != null && m_slope != null && m_tunnel != null; }
         }
 
         public NetInfo info

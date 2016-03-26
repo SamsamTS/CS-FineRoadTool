@@ -55,7 +55,7 @@
     <Compile Include="FineRoadTool.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RoadAIWrapper.cs" />
-    <Compile Include="OptionsPanel.cs" />
+    <Compile Include="OptionsKeymapping.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>

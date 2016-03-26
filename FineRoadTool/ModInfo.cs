@@ -14,6 +14,7 @@ namespace FineRoadTool
         {
             try
             {
+                // Creating setting file
                 GameSettings.AddSettingsFile(new SettingsFile[] { new SettingsFile() { fileName = FineRoadTool.settingsFileName } });
             }
             catch (Exception e)
@@ -40,8 +41,7 @@ namespace FineRoadTool
                 UIHelper group = helper.AddGroup(Name) as UIHelper;
                 UIPanel panel = group.self as UIPanel;
 
-                panel.gameObject.AddComponent<OptionsPanel>();
-
+                //panel.gameObject.AddComponent<OptionsKeymapping>();
             }
             catch (Exception e)
             {
@@ -50,6 +50,6 @@ namespace FineRoadTool
             }
         }
 
-        public const string version = "0.5.1";
+        public const string version = "0.6.0";
     }
 }
