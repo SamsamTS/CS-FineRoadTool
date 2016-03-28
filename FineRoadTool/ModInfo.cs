@@ -41,7 +41,7 @@ namespace FineRoadTool
                 UIHelper group = helper.AddGroup(Name) as UIHelper;
                 UIPanel panel = group.self as UIPanel;
 
-                //panel.gameObject.AddComponent<OptionsKeymapping>();
+                panel.gameObject.AddComponent<OptionsKeymapping>();
             }
             catch (Exception e)
             {
@@ -50,6 +50,6 @@ namespace FineRoadTool
             }
         }
 
-        public const string version = "0.6.0";
+        public const string version = "0.7.0";
     }
 }

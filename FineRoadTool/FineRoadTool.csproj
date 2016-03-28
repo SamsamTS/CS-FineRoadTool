@@ -53,9 +53,37 @@
     <Compile Include="ModInfo.cs" />
     <Compile Include="DebugUtils.cs" />
     <Compile Include="FineRoadTool.cs" />
+    <Compile Include="OptionsKeymapping.cs">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="ResourceLoader.cs" />
     <Compile Include="RoadAIWrapper.cs" />
-    <Compile Include="OptionsKeymapping.cs" />
+    <Compile Include="UIToolOptionsButton.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\BridgeMode.png" />
+    <EmbeddedResource Include="Icons\BridgeModeDisabled.png" />
+    <EmbeddedResource Include="Icons\BridgeModeFocused.png" />
+    <EmbeddedResource Include="Icons\BridgeModeHovered.png" />
+    <EmbeddedResource Include="Icons\BridgeModePressed.png" />
+    <EmbeddedResource Include="Icons\ElevatedMode.png" />
+    <EmbeddedResource Include="Icons\ElevatedModeDisabled.png" />
+    <EmbeddedResource Include="Icons\ElevatedModeFocused.png" />
+    <EmbeddedResource Include="Icons\ElevatedModeHovered.png" />
+    <EmbeddedResource Include="Icons\ElevatedModePressed.png" />
+    <EmbeddedResource Include="Icons\GroundMode.png" />
+    <EmbeddedResource Include="Icons\GroundModeDisabled.png" />
+    <EmbeddedResource Include="Icons\GroundModeFocused.png" />
+    <EmbeddedResource Include="Icons\GroundModeHovered.png" />
+    <EmbeddedResource Include="Icons\GroundModePressed.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\NormalMode.png" />
+    <EmbeddedResource Include="Icons\NormalModeDisabled.png" />
+    <EmbeddedResource Include="Icons\NormalModeFocused.png" />
+    <EmbeddedResource Include="Icons\NormalModeHovered.png" />
+    <EmbeddedResource Include="Icons\NormalModePressed.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
