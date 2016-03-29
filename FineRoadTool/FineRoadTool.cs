@@ -65,6 +65,7 @@ namespace FineRoadTool
 
         private UIToolOptionsButton m_toolOptionButton;
         private bool m_buttonExists;
+        private bool m_activated;
 
         public static readonly SavedInt savedElevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
@@ -94,7 +95,7 @@ namespace FineRoadTool
         public int elevationStep
         {
             get { return m_elevationStep; }
-            set { m_elevationStep = Mathf.Clamp(value, 1, 12);}
+            set { m_elevationStep = Mathf.Clamp(value, 1, 12); }
         }
 
         public int elevation
@@ -104,17 +105,14 @@ namespace FineRoadTool
 
         public bool isActive
         {
-            get
-            {
-                bool canElevate = m_min != 0 || m_max != 0;
-                return m_tool != null && m_current != null && m_roadAI != null && (canElevate || m_buttonExists);
-            }
+            get { return m_activated; }
         }
 
         public void Start()
         {
             instance = this;
 
+            // Getting NetTool
             m_tool = GameObject.FindObjectOfType<NetTool>();
             if (m_tool == null)
             {
@@ -123,6 +121,7 @@ namespace FineRoadTool
                 return;
             }
 
+            // Getting BulldozeTool
             m_bulldozeTool = GameObject.FindObjectOfType<BulldozeTool>();
             if (m_bulldozeTool == null)
             {
@@ -131,6 +130,7 @@ namespace FineRoadTool
                 return;
             }
 
+            // Getting NetTool private fields
             m_elevationField = m_tool.GetType().GetField("m_elevation", BindingFlags.NonPublic | BindingFlags.Instance);
             m_elevationUpField = m_tool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance);
             m_elevationDownField = m_tool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -143,8 +143,10 @@ namespace FineRoadTool
                 return;
             }
 
+            // Restoring elevation step
             m_elevationStep = savedElevationStep;
 
+            // Creating UI
             CreateToolOptionsButton();
 
             DebugUtils.Log("Initialized");
@@ -154,35 +156,26 @@ namespace FineRoadTool
         {
             if (m_tool == null) return;
 
-            if (m_toolOptionButton.isVisibleSelf != isActive) m_toolOptionButton.isVisible = isActive;
-
-            NetInfo prefab = m_tool.enabled ? m_tool.m_prefab : null;
-            if (m_bulldozeTool.enabled) prefab = m_current;
-
-            if (prefab != m_current)
+            try
             {
-                RestorePrefab();
-                m_elevated = m_bridge = m_slope = m_tunnel = null;
-                m_min = m_max = 0;
-                m_current = prefab;
+                // Getting selected prefab
+                NetInfo prefab = m_tool.enabled ? m_tool.m_prefab : null;
+                if (m_bulldozeTool.enabled) prefab = m_current;
 
-                if (m_current == null)
+                // Has the prefab changed?
+                if (prefab != m_current)
                 {
-                    RestoreDefaultKeys();
-                    return;
+                    if (prefab == null)
+                        Deactivate();
+                    else
+                        Activate(prefab);
                 }
-
-                StorePrefab();
-                AttachToolOptionsButton();
-                DisableDefaultKeys();
-
-                if (isActive)
-                {
-                    DebugUtils.Log(m_current.name + " selected");
-                    UpdatePrefab();
-                    m_elevation = (int)m_elevationField.GetValue(m_tool);
-                    m_toolOptionButton.UpdateInfo();
-                }
+            }
+            catch(Exception e)
+            {
+                enabled = false;
+                DebugUtils.Log("Update failed");
+                DebugUtils.LogException(e);
             }
         }
 
@@ -192,11 +185,13 @@ namespace FineRoadTool
 
             Event e = Event.current;
 
+            // Updating the elevation
             if (m_elevation >= 0 && m_elevation <= -256)
                 m_elevation = (int)m_elevationField.GetValue(m_tool);
             else
                 UpdateElevation();
 
+            // Checking key presses
             if (OptionsKeymapping.elevationUp.IsPressed(e))
             {
                 m_elevation += Mathf.RoundToInt(256f * m_elevationStep / 12f);
@@ -249,6 +244,44 @@ namespace FineRoadTool
             }
         }
 
+        private void Activate(NetInfo prefab)
+        {
+            RestorePrefab();
+
+            m_current = prefab;
+            StorePrefab();
+            AttachToolOptionsButton();
+
+            // Is it a valid prefab?
+            if (m_min == 0 && m_max == 0 && !m_buttonExists)
+            {
+                Deactivate();
+                return;
+            }
+
+            DebugUtils.Log("Activated: " + prefab.name + " selected");
+            m_activated = true;
+
+            DisableDefaultKeys();
+            m_elevation = (int)m_elevationField.GetValue(m_tool);
+            UpdatePrefab();
+
+            m_toolOptionButton.isVisible = true;
+        }
+
+        private void Deactivate()
+        {
+            DebugUtils.Log("Deactivated");
+
+            RestorePrefab();
+            RestoreDefaultKeys();
+            m_current = m_elevated = m_bridge = m_slope = m_tunnel = null;
+            m_min = m_max = 0;
+
+            m_toolOptionButton.isVisible = false;
+            m_activated = false;
+        }
+
         private void DisableDefaultKeys()
         {
             if (m_keyDisabled) return;
@@ -273,8 +306,6 @@ namespace FineRoadTool
 
         private void UpdateElevation()
         {
-            if (!isActive) return;
-
             m_elevation = Mathf.Clamp(m_elevation, m_min * 256, m_max * 256);
             if (m_elevationStep < 3) m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_elevation / (256f / 12f)) * (256f / 12f));
 
@@ -356,26 +387,27 @@ namespace FineRoadTool
         {
             if (m_toolOptionButton != null) return;
 
-            m_toolOptionButton = UIView.GetAView().AddUIComponent(typeof(UIToolOptionsButton)) as UIToolOptionsButton;
-
-            if (m_toolOptionButton == null)
+            try
             {
-                DebugUtils.Log("Couldn't create label");
-                return;
+                m_toolOptionButton = UIView.GetAView().AddUIComponent(typeof(UIToolOptionsButton)) as UIToolOptionsButton;
+
+                if (m_toolOptionButton == null)
+                {
+                    DebugUtils.Log("Couldn't create label");
+                    return;
+                }
+
+                m_toolOptionButton.autoSize = false;
+                m_toolOptionButton.size = new Vector2(36, 36);
+                m_toolOptionButton.position = Vector2.zero;
+                m_toolOptionButton.isVisible = false;
             }
-
-            m_toolOptionButton.autoSize = false;
-            m_toolOptionButton.size = new Vector2(36, 36);
-            m_toolOptionButton.position = Vector2.zero;
-            m_toolOptionButton.isVisible = false;
-
-            m_toolOptionButton.eventZOrderChanged += (c, p) =>
+            catch(Exception e)
             {
-                if (m_toolOptionButton.parent is UIMultiStateButton)
-                    m_toolOptionButton.relativePosition = Vector2.zero;
-                else
-                    m_toolOptionButton.relativePosition = new Vector2(36, 0);
-            };
+                enabled = false;
+                DebugUtils.Log("CreateToolOptionsButton failed");
+                DebugUtils.LogException(e);
+            }
         }
 
         private void AttachToolOptionsButton()
@@ -404,6 +436,8 @@ namespace FineRoadTool
             }
 
             m_toolOptionButton.transform.SetParent(optionBar.transform);
+
+            DebugUtils.Log("ElevationStep not found. Absolute position: " + m_toolOptionButton.absolutePosition);
         }
     }
 }

@@ -29,7 +29,7 @@ namespace FineRoadTool
             }
             else if (m_duplicates > 0)
             {
-                Debug.Log(modPrefix + "(x" + (m_duplicates + 1) + ")");
+                Debug.Log(modPrefix + m_lastLog + "(x" + (m_duplicates + 1) + ")");
                 Debug.Log(modPrefix + message);
                 m_duplicates = 0;
             }

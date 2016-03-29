@@ -98,6 +98,18 @@ namespace FineRoadTool
             atlas.RebuildIndexes();
         }
 
+        public static UITextureAtlas GetAtlas(string name)
+        {
+            UITextureAtlas[] atlases = Resources.FindObjectsOfTypeAll(typeof(UITextureAtlas)) as UITextureAtlas[];
+            for (int i = 0; i < atlases.Length; i++)
+            {
+                if (atlases[i].name == name)
+                    return atlases[i];
+            }
+
+            return UIView.GetAView().defaultAtlas;
+        }
+
         private static Texture2D loadTextureFromAssembly(string path)
         {
             Stream manifestResourceStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(path);

@@ -22,12 +22,29 @@ namespace FineRoadTool
 
         private UITextureAtlas m_atlas;
 
+        private UIComponent m_parent;
+
         public override void Start()
         {
             LoadResources();
 
             CreateButton();
             CreateOptionPanel();
+        }
+
+        public override void Update()
+        {
+            if(parent != m_parent)
+            {
+                m_parent = parent;
+                if (parent is UIMultiStateButton)
+                {
+                    relativePosition = Vector2.zero;
+                    parent.BringToFront();
+                }
+                else
+                    relativePosition = new Vector2(36, 0);
+            }
         }
 
         public void UpdateInfo()
@@ -90,6 +107,11 @@ namespace FineRoadTool
                 m_toolOptionsPanel.isVisible = s;
                 if (s)
                 {
+                    m_toolOptionsPanel.relativePosition = new Vector2(-100 + 18, -152);
+
+                    if (m_toolOptionsPanel.absolutePosition.x < 0)
+                        m_toolOptionsPanel.absolutePosition = new Vector2(0, m_toolOptionsPanel.absolutePosition.y);
+
                     m_button.normalBgSprite = "OptionBaseFocused";
                 }
                 else
@@ -105,6 +127,7 @@ namespace FineRoadTool
         private void CreateOptionPanel()
         {
             m_toolOptionsPanel = AddUIComponent<UIPanel>();
+            m_toolOptionsPanel.atlas = ResourceLoader.GetAtlas("Ingame");
             m_toolOptionsPanel.backgroundSprite = "SubcategoriesPanel";
             m_toolOptionsPanel.size = new Vector2(200, 152);
             m_toolOptionsPanel.relativePosition = new Vector2(-100 + 18, -152);
@@ -118,12 +141,14 @@ namespace FineRoadTool
             label.relativePosition = new Vector2(8, 8);
 
             UIPanel sliderPanel = m_toolOptionsPanel.AddUIComponent<UIPanel>();
+            sliderPanel.atlas = m_toolOptionsPanel.atlas;
             sliderPanel.backgroundSprite = "GenericPanel";
             sliderPanel.color = new Color32(206, 206, 206, 255);
             sliderPanel.size = new Vector2(m_toolOptionsPanel.width - 16, 36);
             sliderPanel.relativePosition = new Vector2(8, 28);
 
             m_elevationStepLabel = sliderPanel.AddUIComponent<UILabel>();
+            m_elevationStepLabel.atlas = m_toolOptionsPanel.atlas;
             m_elevationStepLabel.backgroundSprite = "TextFieldPanel";
             m_elevationStepLabel.verticalAlignment = UIVerticalAlignment.Bottom;
             m_elevationStepLabel.textAlignment = UIHorizontalAlignment.Center;
@@ -141,11 +166,13 @@ namespace FineRoadTool
             m_elevationStepSlider.tooltip = OptionsKeymapping.elevationStepUp.ToLocalizedString("KEYNAME") + " and " + OptionsKeymapping.elevationStepDown.ToLocalizedString("KEYNAME") + " to change Elevation Step";
 
             UISlicedSprite bgSlider = m_elevationStepSlider.AddUIComponent<UISlicedSprite>();
+            bgSlider.atlas = m_toolOptionsPanel.atlas;
             bgSlider.spriteName = "BudgetSlider";
             bgSlider.size = new Vector2(m_elevationStepSlider.width, 9);
             bgSlider.relativePosition = new Vector2(0, 4);
 
             UISlicedSprite thumb = m_elevationStepSlider.AddUIComponent<UISlicedSprite>();
+            thumb.atlas = m_toolOptionsPanel.atlas;
             thumb.spriteName = "SliderBudget";
             m_elevationStepSlider.thumbObject = thumb;
 
@@ -170,6 +197,7 @@ namespace FineRoadTool
             label.relativePosition = new Vector2(8, 72);
 
             UIPanel modePanel = m_toolOptionsPanel.AddUIComponent<UIPanel>();
+            modePanel.atlas = m_toolOptionsPanel.atlas;
             modePanel.backgroundSprite = "GenericPanel";
             modePanel.color = new Color32(206, 206, 206, 255);
             modePanel.size = new Vector2(m_toolOptionsPanel.width - 16, 52);
@@ -267,7 +295,7 @@ namespace FineRoadTool
 
             m_atlas = ResourceLoader.CreateTextureAtlas("FineRoadTool", spriteNames, "FineRoadTool.Icons.");
 
-            UITextureAtlas defaultAtlas = UIView.GetAView().defaultAtlas;
+            UITextureAtlas defaultAtlas = ResourceLoader.GetAtlas("Ingame");
             Texture2D[] textures = new Texture2D[]
             {
                 defaultAtlas["OptionBase"].texture,
