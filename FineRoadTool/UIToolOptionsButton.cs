@@ -102,17 +102,23 @@ namespace FineRoadTool
 
             m_button.eventClick += (c, p) => { base.OnClick(p); };
 
-            eventCheckChanged += (c, s) =>
+            eventCheckChanged += (c, visible) =>
             {
-                m_toolOptionsPanel.isVisible = s;
-                if (s)
+                m_toolOptionsPanel.isVisible = visible;
+                if (visible)
                 {
-                    m_toolOptionsPanel.relativePosition = new Vector2(-100 + 18, -152);
-
-                    if (m_toolOptionsPanel.absolutePosition.x < 0)
-                        m_toolOptionsPanel.absolutePosition = new Vector2(0, m_toolOptionsPanel.absolutePosition.y);
+                    m_toolOptionsPanel.absolutePosition = new Vector2(
+                        Mathf.Clamp(m_toolOptionsPanel.absolutePosition.x, 0, Screen.width - m_toolOptionsPanel.width),
+                        Mathf.Clamp(m_toolOptionsPanel.absolutePosition.y, 0, Screen.height - m_toolOptionsPanel.height));
 
                     m_button.normalBgSprite = "OptionBaseFocused";
+
+                    UIComponent component = m_toolOptionsPanel.parent;
+                    while(component != null)
+                    {
+                        component.BringToFront();
+                        component = component.parent;
+                    }
                 }
                 else
                 {
@@ -134,11 +140,17 @@ namespace FineRoadTool
 
             m_toolOptionsPanel.isVisible = false;
 
+            UIDragHandle dragHandle = m_toolOptionsPanel.AddUIComponent<UIDragHandle>();
+            dragHandle.size = m_toolOptionsPanel.size;
+            dragHandle.relativePosition = Vector3.zero;
+            dragHandle.target = parent;
+
             // Elevation step
             UILabel label = m_toolOptionsPanel.AddUIComponent<UILabel>();
             label.textScale = 0.9f;
             label.text = "Elevation Step:";
             label.relativePosition = new Vector2(8, 8);
+            label.SendToBack();
 
             UIPanel sliderPanel = m_toolOptionsPanel.AddUIComponent<UIPanel>();
             sliderPanel.atlas = m_toolOptionsPanel.atlas;
@@ -195,6 +207,7 @@ namespace FineRoadTool
             label.textScale = 0.9f;
             label.text = "Modes:";
             label.relativePosition = new Vector2(8, 72);
+            label.SendToBack();
 
             UIPanel modePanel = m_toolOptionsPanel.AddUIComponent<UIPanel>();
             modePanel.atlas = m_toolOptionsPanel.atlas;

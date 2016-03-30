@@ -66,6 +66,8 @@ namespace FineRoadTool
         private UIToolOptionsButton m_toolOptionButton;
         private bool m_buttonExists;
         private bool m_activated;
+        private bool m_toolEnabled;
+        private bool m_bulldozeToolEnabled;
 
         public static readonly SavedInt savedElevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
@@ -159,13 +161,15 @@ namespace FineRoadTool
             try
             {
                 // Getting selected prefab
-                NetInfo prefab = m_tool.enabled ? m_tool.m_prefab : null;
-                if (m_bulldozeTool.enabled) prefab = m_current;
+                NetInfo prefab = m_tool.enabled || m_bulldozeTool.enabled ? m_tool.m_prefab : null;
 
-                // Has the prefab changed?
-                if (prefab != m_current)
+                // Has the prefab/tool changed?
+                if (prefab != m_current || m_toolEnabled != m_tool.enabled || m_bulldozeToolEnabled != m_bulldozeTool.enabled)
                 {
-                    if (prefab == null)
+                    m_toolEnabled = m_tool.enabled;
+                    m_bulldozeToolEnabled = m_bulldozeTool.enabled;
+
+                    if (prefab == null && !m_bulldozeTool.enabled)
                         Deactivate();
                     else
                         Activate(prefab);
@@ -247,39 +251,44 @@ namespace FineRoadTool
         private void Activate(NetInfo prefab)
         {
             RestorePrefab();
-
             m_current = prefab;
+
+            if (prefab == null) return;
+
             StorePrefab();
             AttachToolOptionsButton();
 
+            if (m_bulldozeTool.enabled && !m_buttonExists) return;
+
             // Is it a valid prefab?
-            if (m_min == 0 && m_max == 0 && !m_buttonExists)
+            if ((m_bulldozeTool.enabled || (m_min == 0 && m_max == 0)) && !m_buttonExists)
             {
                 Deactivate();
                 return;
             }
 
-            DebugUtils.Log("Activated: " + prefab.name + " selected");
-            m_activated = true;
-
             DisableDefaultKeys();
             m_elevation = (int)m_elevationField.GetValue(m_tool);
             UpdatePrefab();
 
+            m_activated = true;
             m_toolOptionButton.isVisible = true;
+
+            DebugUtils.Log("Activated: " + prefab.name + " selected");
         }
 
         private void Deactivate()
         {
-            DebugUtils.Log("Deactivated");
+            if (!isActive) return;
 
             RestorePrefab();
             RestoreDefaultKeys();
-            m_current = m_elevated = m_bridge = m_slope = m_tunnel = null;
             m_min = m_max = 0;
 
             m_toolOptionButton.isVisible = false;
             m_activated = false;
+
+            DebugUtils.Log("Deactivated");
         }
 
         private void DisableDefaultKeys()
