@@ -39,9 +39,6 @@ namespace FineRoadTool
         private int m_elevation = 0;
         private int m_elevationStep = 3;
 
-        private int m_min;
-        private int m_max;
-
         private NetTool m_tool;
         private BulldozeTool m_bulldozeTool;
 
@@ -258,10 +255,11 @@ namespace FineRoadTool
             StorePrefab();
             AttachToolOptionsButton();
 
-            if (m_bulldozeTool.enabled && !m_buttonExists) return;
-
             // Is it a valid prefab?
-            if ((m_bulldozeTool.enabled || (m_min == 0 && m_max == 0)) && !m_buttonExists)
+            int min, max;
+            m_current.m_netAI.GetElevationLimits(out min, out max);
+
+            if ((m_bulldozeTool.enabled || (min == 0 && max == 0)) && !m_buttonExists)
             {
                 Deactivate();
                 return;
@@ -283,7 +281,6 @@ namespace FineRoadTool
 
             RestorePrefab();
             RestoreDefaultKeys();
-            m_min = m_max = 0;
 
             m_toolOptionButton.isVisible = false;
             m_activated = false;
@@ -315,7 +312,10 @@ namespace FineRoadTool
 
         private void UpdateElevation()
         {
-            m_elevation = Mathf.Clamp(m_elevation, m_min * 256, m_max * 256);
+            int min, max;
+            m_current.m_netAI.GetElevationLimits(out min, out max);
+
+            m_elevation = Mathf.Clamp(m_elevation, min * 256, max * 256);
             if (m_elevationStep < 3) m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_elevation / (256f / 12f)) * (256f / 12f));
 
             if ((int)m_elevationField.GetValue(m_tool) != m_elevation)
@@ -328,8 +328,6 @@ namespace FineRoadTool
         private void StorePrefab()
         {
             if (m_current == null) return;
-
-            m_current.m_netAI.GetElevationLimits(out m_min, out m_max);
 
             m_roadAI = new RoadAIWrapper(m_current.m_netAI);
             if (!m_roadAI.hasElevation) return;
