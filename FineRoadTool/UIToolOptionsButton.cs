@@ -44,6 +44,9 @@ namespace FineRoadTool
                 }
                 else
                     relativePosition = new Vector2(36, 0);
+
+                if (m_toolOptionsPanel != null)
+                    m_toolOptionsPanel.isVisible = isVisible && isChecked;
             }
         }
 
@@ -102,23 +105,21 @@ namespace FineRoadTool
 
             m_button.eventClick += (c, p) => { base.OnClick(p); };
 
-            eventCheckChanged += (c, visible) =>
+            eventCheckChanged += (c, isChecked) =>
             {
-                m_toolOptionsPanel.isVisible = visible;
-                if (visible)
+                m_toolOptionsPanel.isVisible = isVisible && isChecked;
+                if (isChecked)
                 {
+                    if(m_toolOptionsPanel.absolutePosition.x <0)
+                        m_toolOptionsPanel.absolutePosition = new Vector2(absolutePosition.x - 82, absolutePosition.y - 152);
+
                     m_toolOptionsPanel.absolutePosition = new Vector2(
                         Mathf.Clamp(m_toolOptionsPanel.absolutePosition.x, 0, Screen.width - m_toolOptionsPanel.width),
                         Mathf.Clamp(m_toolOptionsPanel.absolutePosition.y, 0, Screen.height - m_toolOptionsPanel.height));
 
                     m_button.normalBgSprite = "OptionBaseFocused";
 
-                    UIComponent component = m_toolOptionsPanel.parent;
-                    while(component != null)
-                    {
-                        component.BringToFront();
-                        component = component.parent;
-                    }
+                    m_toolOptionsPanel.BringToFront();
                 }
                 else
                 {
@@ -128,15 +129,21 @@ namespace FineRoadTool
             };
         }
 
+        protected override void OnVisibilityChanged()
+        {
+            if(m_toolOptionsPanel != null)
+                m_toolOptionsPanel.isVisible = isVisible && isChecked;
+        }
+
         protected override void OnClick(UIMouseEventParameter p) { }
 
         private void CreateOptionPanel()
         {
-            m_toolOptionsPanel = AddUIComponent<UIPanel>();
+            m_toolOptionsPanel = UIView.GetAView().AddUIComponent(typeof(UIPanel)) as UIPanel;
             m_toolOptionsPanel.atlas = ResourceLoader.GetAtlas("Ingame");
             m_toolOptionsPanel.backgroundSprite = "SubcategoriesPanel";
             m_toolOptionsPanel.size = new Vector2(200, 152);
-            m_toolOptionsPanel.relativePosition = new Vector2(-100 + 18, -152);
+            m_toolOptionsPanel.absolutePosition = new Vector2(-1000, -1000);
 
             m_toolOptionsPanel.isVisible = false;
 

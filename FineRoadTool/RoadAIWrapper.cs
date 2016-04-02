@@ -26,6 +26,7 @@ namespace FineRoadTool
             {
                 m_elevated = null;
                 m_bridge = null;
+                m_slope = null;
                 m_tunnel = null;
             }
         }
