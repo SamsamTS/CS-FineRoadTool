@@ -20,6 +20,8 @@ namespace FineRoadTool
         private UICheckBox m_elevatedModeButton;
         private UICheckBox m_bridgeModeButton;
 
+        private UICheckBox m_smoothSlope;
+
         private UITextureAtlas m_atlas;
 
         private UIComponent m_parent;
@@ -111,7 +113,7 @@ namespace FineRoadTool
                 if (isChecked)
                 {
                     if(m_toolOptionsPanel.absolutePosition.x <0)
-                        m_toolOptionsPanel.absolutePosition = new Vector2(absolutePosition.x - 82, absolutePosition.y - 152);
+                        m_toolOptionsPanel.absolutePosition = new Vector2(absolutePosition.x - 82, absolutePosition.y - 180);
 
                     m_toolOptionsPanel.absolutePosition = new Vector2(
                         Mathf.Clamp(m_toolOptionsPanel.absolutePosition.x, 0, Screen.width - m_toolOptionsPanel.width),
@@ -142,7 +144,7 @@ namespace FineRoadTool
             m_toolOptionsPanel = UIView.GetAView().AddUIComponent(typeof(UIPanel)) as UIPanel;
             m_toolOptionsPanel.atlas = ResourceLoader.GetAtlas("Ingame");
             m_toolOptionsPanel.backgroundSprite = "SubcategoriesPanel";
-            m_toolOptionsPanel.size = new Vector2(200, 152);
+            m_toolOptionsPanel.size = new Vector2(200, 180);
             m_toolOptionsPanel.absolutePosition = new Vector2(-1000, -1000);
 
             m_toolOptionsPanel.isVisible = false;
@@ -223,22 +225,61 @@ namespace FineRoadTool
             modePanel.size = new Vector2(m_toolOptionsPanel.width - 16, 52);
             modePanel.relativePosition = new Vector2(8, 92);
 
-            m_normalModeButton = createCheckBox(modePanel, "NormalMode", "Unmodded road placement behavior");
+            m_normalModeButton = CreateModeCheckBox(modePanel, "NormalMode", "Unmodded road placement behavior");
             m_normalModeButton.relativePosition = new Vector2(8, 8);
 
-            m_groundModeButton = createCheckBox(modePanel, "GroundMode", "Forces the ground to follow the elevation of the road");
+            m_groundModeButton = CreateModeCheckBox(modePanel, "GroundMode", "Forces the ground to follow the elevation of the road");
             m_groundModeButton.relativePosition = new Vector2(52, 8);
 
-            m_elevatedModeButton = createCheckBox(modePanel, "ElevatedMode", "Forces the use of elevated pieces if available");
+            m_elevatedModeButton = CreateModeCheckBox(modePanel, "ElevatedMode", "Forces the use of elevated pieces if available");
             m_elevatedModeButton.relativePosition = new Vector2(96, 8);
 
-            m_bridgeModeButton = createCheckBox(modePanel, "BridgeMode", "Forces the use of bridge pieces if available");
+            m_bridgeModeButton = CreateModeCheckBox(modePanel, "BridgeMode", "Forces the use of bridge pieces if available");
             m_bridgeModeButton.relativePosition = new Vector2(140, 8);
 
             m_normalModeButton.isChecked = true;
+
+            // Smooth Slope
+            m_smoothSlope = CreateCheckBox(m_toolOptionsPanel);
+            m_smoothSlope.label.text = "Smooth slope";
+            m_smoothSlope.isChecked = true;
+            m_smoothSlope.relativePosition = new Vector3(8, 152);
+
+            m_smoothSlope.eventCheckChanged += (c, state) =>
+            {
+                FineRoadTool.instance.smoothSlope = state;
+            };
         }
 
-        private UICheckBox createCheckBox(UIComponent parent, string spriteName, string toolTip)
+        private UICheckBox CreateCheckBox(UIComponent parent)
+        {
+            UICheckBox checkBox = (UICheckBox)parent.AddUIComponent<UICheckBox>();
+
+            checkBox.width = 300f;
+            checkBox.height = 20f;
+            checkBox.clipChildren = true;
+
+            UISprite sprite = checkBox.AddUIComponent<UISprite>();
+            sprite.atlas = m_toolOptionsPanel.atlas;
+            sprite.spriteName = "ToggleBase";
+            sprite.size = new Vector2(16f, 16f);
+            sprite.relativePosition = Vector3.zero;
+
+            checkBox.checkedBoxObject = sprite.AddUIComponent<UISprite>();
+            ((UISprite)checkBox.checkedBoxObject).atlas = m_toolOptionsPanel.atlas;
+            ((UISprite)checkBox.checkedBoxObject).spriteName = "ToggleBaseFocused";
+            checkBox.checkedBoxObject.size = new Vector2(16f, 16f);
+            checkBox.checkedBoxObject.relativePosition = Vector3.zero;
+
+            checkBox.label = checkBox.AddUIComponent<UILabel>();
+            checkBox.label.text = " ";
+            checkBox.label.textScale = 0.9f;
+            checkBox.label.relativePosition = new Vector3(22f, 2f);
+
+            return checkBox;
+        }
+
+        private UICheckBox CreateModeCheckBox(UIComponent parent, string spriteName, string toolTip)
         {
             UICheckBox checkBox = parent.AddUIComponent<UICheckBox>();
             checkBox.size = new Vector2(36, 36);

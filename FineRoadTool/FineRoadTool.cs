@@ -5,6 +5,7 @@ using System;
 using System.Reflection;
 
 using ColossalFramework;
+using ColossalFramework.Math;
 using ColossalFramework.UI;
 
 namespace FineRoadTool
@@ -42,10 +43,12 @@ namespace FineRoadTool
         private NetTool m_tool;
         private BulldozeTool m_bulldozeTool;
 
+        private FieldInfo m_buildErrors;
         private FieldInfo m_elevationField;
         private FieldInfo m_elevationUpField;
         private FieldInfo m_elevationDownField;
         private bool m_keyDisabled;
+        private Vector2 m_mousePosition;
 
         #region Default value storage
         private NetInfo m_current;
@@ -53,12 +56,14 @@ namespace FineRoadTool
         private NetInfo m_bridge;
         private NetInfo m_slope;
         private NetInfo m_tunnel;
+        private float m_maxSlope;
         private bool m_flattenTerrain;
         private bool m_followTerrain;
         #endregion
 
         private RoadAIWrapper m_roadAI;
         private Mode m_mode;
+        private bool m_smoothSlope = true;
 
         private UIToolOptionsButton m_toolOptionButton;
         private bool m_buttonExists;
@@ -107,6 +112,17 @@ namespace FineRoadTool
             get { return m_activated; }
         }
 
+        public bool smoothSlope
+        {
+            get { return m_smoothSlope; }
+
+            set
+            {
+                m_smoothSlope = value;
+                UpdatePrefab();
+            }
+        }
+
         public void Start()
         {
             instance = this;
@@ -130,11 +146,12 @@ namespace FineRoadTool
             }
 
             // Getting NetTool private fields
+            m_buildErrors = m_tool.GetType().GetField("m_buildErrors", BindingFlags.NonPublic | BindingFlags.Instance);
             m_elevationField = m_tool.GetType().GetField("m_elevation", BindingFlags.NonPublic | BindingFlags.Instance);
             m_elevationUpField = m_tool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance);
             m_elevationDownField = m_tool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance);
 
-            if (m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null)
+            if (m_buildErrors == null || m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null)
             {
                 DebugUtils.Log("NetTool fields not found");
                 m_tool = null;
@@ -187,7 +204,7 @@ namespace FineRoadTool
             Event e = Event.current;
 
             // Updating the elevation
-            if (m_elevation >= 0 && m_elevation <= -256)
+            if (m_elevation >= 0 || m_elevation <= -256)
                 m_elevation = (int)m_elevationField.GetValue(m_tool);
             else
                 UpdateElevation();
@@ -197,11 +214,13 @@ namespace FineRoadTool
             {
                 m_elevation += Mathf.RoundToInt(256f * m_elevationStep / 12f);
                 UpdateElevation();
+                m_mousePosition = Vector2.zero;
             }
             else if (OptionsKeymapping.elevationDown.IsPressed(e))
             {
                 m_elevation -= Mathf.RoundToInt(256f * m_elevationStep / 12f);
                 UpdateElevation();
+                m_mousePosition = Vector2.zero;
             }
             else if (OptionsKeymapping.elevationStepUp.IsPressed(e))
             {
@@ -241,7 +260,16 @@ namespace FineRoadTool
             {
                 m_elevation = 0;
                 UpdateElevation();
+                m_mousePosition = Vector2.zero;
                 m_toolOptionButton.UpdateInfo();
+            }
+
+            bool slopeTooSteep = ((ToolBase.ToolErrors)m_buildErrors.GetValue(m_tool) & ToolBase.ToolErrors.SlopeTooSteep) != ToolBase.ToolErrors.None;
+
+            if (e.mousePosition != m_mousePosition || slopeTooSteep)
+            {
+                UpdateMaxSlope();
+                m_mousePosition = e.mousePosition;
             }
         }
 
@@ -325,6 +353,31 @@ namespace FineRoadTool
             }
         }
 
+        private void UpdateMaxSlope()
+        {
+            if (NetTool.m_nodePositionsMain.m_size > 1)
+            {
+                Vector3 a = NetTool.m_nodePositionsMain.m_buffer[0].m_position;
+                Vector3 b = NetTool.m_nodePositionsMain.m_buffer[NetTool.m_nodePositionsMain.m_size - 1].m_position;
+
+                float slope = m_maxSlope;
+
+                if (((ToolBase.ToolErrors)m_buildErrors.GetValue(m_tool) & ToolBase.ToolErrors.SlopeTooSteep) == ToolBase.ToolErrors.None)
+                    slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / VectorUtils.LengthSqrXZ(a - b)) + 0.01f, 0, m_maxSlope);
+
+                if (m_current != null)
+                {
+                    m_current.m_maxSlope = slope;
+                    m_current.m_followTerrain = false;
+                    m_current.m_flattenTerrain = true;
+                }
+                if (m_elevated != null) m_elevated.m_maxSlope = slope;
+                if (m_bridge != null) m_bridge.m_maxSlope = slope;
+                if (m_slope != null) m_slope.m_maxSlope = slope;
+                if (m_tunnel != null) m_tunnel.m_maxSlope = slope;
+            }
+        }
+
         private void StorePrefab()
         {
             if (m_current == null) return;
@@ -338,6 +391,8 @@ namespace FineRoadTool
             m_tunnel = m_roadAI.tunnel;
             m_followTerrain = m_current.m_followTerrain;
             m_flattenTerrain = m_current.m_flattenTerrain;
+
+            m_maxSlope = m_current.m_maxSlope;
         }
 
         private void RestorePrefab()
@@ -351,6 +406,12 @@ namespace FineRoadTool
             m_roadAI.tunnel = m_tunnel;
             m_current.m_followTerrain = m_followTerrain;
             m_current.m_flattenTerrain = m_flattenTerrain;
+
+            if (m_current != null) m_current.m_maxSlope = m_maxSlope;
+            if (m_elevated != null) m_elevated.m_maxSlope = m_maxSlope;
+            if (m_bridge != null) m_bridge.m_maxSlope = m_maxSlope;
+            if (m_slope != null) m_slope.m_maxSlope = m_maxSlope;
+            if (m_tunnel != null) m_tunnel.m_maxSlope = m_maxSlope;
         }
 
         private void UpdatePrefab()
@@ -359,6 +420,12 @@ namespace FineRoadTool
 
             RestorePrefab();
 
+            if (m_smoothSlope)
+            {
+                m_current.m_followTerrain = false;
+                m_current.m_flattenTerrain = true;
+            }
+
             switch (m_mode)
             {
                 case Mode.Ground:
@@ -366,8 +433,6 @@ namespace FineRoadTool
                     m_roadAI.bridge = null;
                     m_roadAI.slope = null;
                     m_roadAI.tunnel = m_current;
-                    m_current.m_followTerrain = false;
-                    m_current.m_flattenTerrain = true;
                     break;
                 case Mode.Elevated:
                     if (m_elevated != null)
