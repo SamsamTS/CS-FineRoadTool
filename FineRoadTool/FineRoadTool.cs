@@ -63,7 +63,7 @@ namespace FineRoadTool
 
         private RoadAIWrapper m_roadAI;
         private Mode m_mode;
-        private bool m_smoothSlope = true;
+        private bool m_straightSlope = false;
 
         private UIToolOptionsButton m_toolOptionButton;
         private bool m_buttonExists;
@@ -112,13 +112,13 @@ namespace FineRoadTool
             get { return m_activated; }
         }
 
-        public bool smoothSlope
+        public bool straightSlope
         {
-            get { return m_smoothSlope; }
+            get { return m_straightSlope; }
 
             set
             {
-                m_smoothSlope = value;
+                m_straightSlope = value;
                 UpdatePrefab();
             }
         }
@@ -264,12 +264,15 @@ namespace FineRoadTool
                 m_toolOptionButton.UpdateInfo();
             }
 
-            bool slopeTooSteep = ((ToolBase.ToolErrors)m_buildErrors.GetValue(m_tool) & ToolBase.ToolErrors.SlopeTooSteep) != ToolBase.ToolErrors.None;
-
-            if (e.mousePosition != m_mousePosition || slopeTooSteep)
+            if (m_straightSlope)
             {
-                UpdateMaxSlope();
-                m_mousePosition = e.mousePosition;
+                bool slopeTooSteep = ((ToolBase.ToolErrors)m_buildErrors.GetValue(m_tool) & ToolBase.ToolErrors.SlopeTooSteep) != ToolBase.ToolErrors.None;
+
+                if (e.mousePosition != m_mousePosition || slopeTooSteep)
+                {
+                    UpdateMaxSlope();
+                    m_mousePosition = e.mousePosition;
+                }
             }
         }
 
@@ -365,12 +368,7 @@ namespace FineRoadTool
                 if (((ToolBase.ToolErrors)m_buildErrors.GetValue(m_tool) & ToolBase.ToolErrors.SlopeTooSteep) == ToolBase.ToolErrors.None)
                     slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / VectorUtils.LengthSqrXZ(a - b)) + 0.01f, 0, m_maxSlope);
 
-                if (m_current != null)
-                {
-                    m_current.m_maxSlope = slope;
-                    m_current.m_followTerrain = false;
-                    m_current.m_flattenTerrain = true;
-                }
+                if (m_current != null)  m_current.m_maxSlope = slope;
                 if (m_elevated != null) m_elevated.m_maxSlope = slope;
                 if (m_bridge != null) m_bridge.m_maxSlope = slope;
                 if (m_slope != null) m_slope.m_maxSlope = slope;
@@ -382,36 +380,43 @@ namespace FineRoadTool
         {
             if (m_current == null) return;
 
-            m_roadAI = new RoadAIWrapper(m_current.m_netAI);
-            if (!m_roadAI.hasElevation) return;
-
-            m_elevated = m_roadAI.elevated;
-            m_bridge = m_roadAI.bridge;
-            m_slope = m_roadAI.slope;
-            m_tunnel = m_roadAI.tunnel;
             m_followTerrain = m_current.m_followTerrain;
             m_flattenTerrain = m_current.m_flattenTerrain;
 
             m_maxSlope = m_current.m_maxSlope;
+
+            m_roadAI = new RoadAIWrapper(m_current.m_netAI);
+
+            if (m_roadAI.hasElevation)
+            {
+                m_elevated = m_roadAI.elevated;
+                m_bridge = m_roadAI.bridge;
+                m_slope = m_roadAI.slope;
+                m_tunnel = m_roadAI.tunnel;
+            }
         }
 
         private void RestorePrefab()
         {
-            if (m_current == null || !m_roadAI.hasElevation) return;
+            if (m_current == null) return;
 
-            m_roadAI.info = m_current;
-            m_roadAI.elevated = m_elevated;
-            m_roadAI.bridge = m_bridge;
-            m_roadAI.slope = m_slope;
-            m_roadAI.tunnel = m_tunnel;
             m_current.m_followTerrain = m_followTerrain;
             m_current.m_flattenTerrain = m_flattenTerrain;
+            m_current.m_maxSlope = m_maxSlope;
 
-            if (m_current != null) m_current.m_maxSlope = m_maxSlope;
             if (m_elevated != null) m_elevated.m_maxSlope = m_maxSlope;
             if (m_bridge != null) m_bridge.m_maxSlope = m_maxSlope;
             if (m_slope != null) m_slope.m_maxSlope = m_maxSlope;
             if (m_tunnel != null) m_tunnel.m_maxSlope = m_maxSlope;
+
+            if (m_roadAI.hasElevation)
+            {
+                m_roadAI.info = m_current;
+                m_roadAI.elevated = m_elevated;
+                m_roadAI.bridge = m_bridge;
+                m_roadAI.slope = m_slope;
+                m_roadAI.tunnel = m_tunnel;
+            }
         }
 
         private void UpdatePrefab()
@@ -420,7 +425,7 @@ namespace FineRoadTool
 
             RestorePrefab();
 
-            if (m_smoothSlope)
+            if(m_straightSlope && m_roadAI.hasElevation)
             {
                 m_current.m_followTerrain = false;
                 m_current.m_flattenTerrain = true;

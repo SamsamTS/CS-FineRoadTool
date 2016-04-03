@@ -20,7 +20,7 @@ namespace FineRoadTool
         private UICheckBox m_elevatedModeButton;
         private UICheckBox m_bridgeModeButton;
 
-        private UICheckBox m_smoothSlope;
+        private UICheckBox m_straightSlope;
 
         private UITextureAtlas m_atlas;
 
@@ -49,6 +49,8 @@ namespace FineRoadTool
 
                 if (m_toolOptionsPanel != null)
                     m_toolOptionsPanel.isVisible = isVisible && isChecked;
+
+                UpdateInfo();
             }
         }
 
@@ -239,15 +241,16 @@ namespace FineRoadTool
 
             m_normalModeButton.isChecked = true;
 
-            // Smooth Slope
-            m_smoothSlope = CreateCheckBox(m_toolOptionsPanel);
-            m_smoothSlope.label.text = "Smooth slope";
-            m_smoothSlope.isChecked = true;
-            m_smoothSlope.relativePosition = new Vector3(8, 152);
+            // Straight Slope
+            m_straightSlope = CreateCheckBox(m_toolOptionsPanel);
+            m_straightSlope.label.text = "Straight slope";
+            m_straightSlope.tooltip = "Makes the road go straight from A to B instead of following the terrain";
+            m_straightSlope.isChecked = false;
+            m_straightSlope.relativePosition = new Vector3(8, 152);
 
-            m_smoothSlope.eventCheckChanged += (c, state) =>
+            m_straightSlope.eventCheckChanged += (c, state) =>
             {
-                FineRoadTool.instance.smoothSlope = state;
+                FineRoadTool.instance.straightSlope = state;
             };
         }
 
