@@ -189,7 +189,7 @@ namespace FineRoadTool
                         Activate(prefab);
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 enabled = false;
                 DebugUtils.Log("Update failed");
@@ -302,6 +302,7 @@ namespace FineRoadTool
 
             m_activated = true;
             m_toolOptionButton.isVisible = true;
+            m_toolOptionButton.UpdateInfo();
 
             DebugUtils.Log("Activated: " + prefab.name + " selected");
         }
@@ -368,7 +369,7 @@ namespace FineRoadTool
                 if (((ToolBase.ToolErrors)m_buildErrors.GetValue(m_tool) & ToolBase.ToolErrors.SlopeTooSteep) == ToolBase.ToolErrors.None)
                     slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / VectorUtils.LengthSqrXZ(a - b)) + 0.01f, 0, m_maxSlope);
 
-                if (m_current != null)  m_current.m_maxSlope = slope;
+                if (m_current != null) m_current.m_maxSlope = slope;
                 if (m_elevated != null) m_elevated.m_maxSlope = slope;
                 if (m_bridge != null) m_bridge.m_maxSlope = slope;
                 if (m_slope != null) m_slope.m_maxSlope = slope;
@@ -425,19 +426,22 @@ namespace FineRoadTool
 
             RestorePrefab();
 
-            if(m_straightSlope && m_roadAI.hasElevation)
-            {
-                m_current.m_followTerrain = false;
-                m_current.m_flattenTerrain = true;
-            }
-
             switch (m_mode)
             {
+                case Mode.Normal:
+                    if (m_straightSlope && m_roadAI.hasElevation)
+                    {
+                        m_current.m_followTerrain = false;
+                        m_current.m_flattenTerrain = true;
+                    }
+                    break;
                 case Mode.Ground:
                     m_roadAI.elevated = m_current;
                     m_roadAI.bridge = null;
                     m_roadAI.slope = null;
                     m_roadAI.tunnel = m_current;
+                    m_current.m_followTerrain = false;
+                    m_current.m_flattenTerrain = true;
                     break;
                 case Mode.Elevated:
                     if (m_elevated != null)
@@ -479,7 +483,7 @@ namespace FineRoadTool
                 m_toolOptionButton.position = Vector2.zero;
                 m_toolOptionButton.isVisible = false;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 enabled = false;
                 DebugUtils.Log("CreateToolOptionsButton failed");
