@@ -26,6 +26,8 @@ namespace FineRoadTool
         public static readonly SavedInputKey modesCycleRight = new SavedInputKey("modesCycleRight", FineRoadTool.settingsFileName, SavedInputKey.Encode(KeyCode.RightArrow, true, false, false), true);
         public static readonly SavedInputKey modesCycleLeft = new SavedInputKey("modesCycleLeft", FineRoadTool.settingsFileName, SavedInputKey.Encode(KeyCode.LeftArrow, true, false, false), true);
 
+        public static readonly SavedInputKey toggleStraightSlope = new SavedInputKey("toggleStraightSlope", FineRoadTool.settingsFileName, SavedInputKey.Encode(KeyCode.S, false, true, false), true);
+
         private int count = 0;
 
         private void Awake()
@@ -37,6 +39,7 @@ namespace FineRoadTool
             AddKeymapping("Elevation Step Down", elevationStepDown);
             AddKeymapping("Cycle Modes Right", modesCycleRight);
             AddKeymapping("Cycle Modes Left", modesCycleLeft);
+            AddKeymapping("Toggle Straight Slope", toggleStraightSlope);
         }
 
         private void AddKeymapping(string label, SavedInputKey savedInputKey)

@@ -60,6 +60,9 @@ namespace FineRoadTool
 
             m_button.text = m_elevationStepLabel.text = FineRoadTool.instance.elevationStep + "m\n";
             m_elevationStepSlider.value = FineRoadTool.instance.elevationStep;
+            m_straightSlope.isChecked = FineRoadTool.instance.straightSlope;
+
+            m_button.normalFgSprite = FineRoadTool.instance.straightSlope ? "ToolbarIconGroup1Hovered" : null;
 
             switch (FineRoadTool.instance.mode)
             {

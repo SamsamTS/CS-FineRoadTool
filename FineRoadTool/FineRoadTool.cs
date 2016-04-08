@@ -118,8 +118,12 @@ namespace FineRoadTool
 
             set
             {
-                m_straightSlope = value;
-                UpdatePrefab();
+                if (value != m_straightSlope)
+                {
+                    m_straightSlope = value;
+                    m_mousePosition = Vector2.zero;
+                    UpdatePrefab();
+                }
             }
         }
 
@@ -263,6 +267,11 @@ namespace FineRoadTool
                 m_mousePosition = Vector2.zero;
                 m_toolOptionButton.UpdateInfo();
             }
+            else if (OptionsKeymapping.toggleStraightSlope.IsPressed(e))
+            {
+                DebugUtils.Log("toggleStraightSlope");
+                straightSlope = !m_straightSlope;
+            }
 
             if (m_straightSlope)
             {
@@ -359,6 +368,8 @@ namespace FineRoadTool
 
         private void UpdateMaxSlope()
         {
+            if (m_current == null) return;
+
             if (NetTool.m_nodePositionsMain.m_size > 1)
             {
                 Vector3 a = NetTool.m_nodePositionsMain.m_buffer[0].m_position;
@@ -369,7 +380,7 @@ namespace FineRoadTool
                 if (((ToolBase.ToolErrors)m_buildErrors.GetValue(m_tool) & ToolBase.ToolErrors.SlopeTooSteep) == ToolBase.ToolErrors.None)
                     slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / VectorUtils.LengthSqrXZ(a - b)) + 0.01f, 0, m_maxSlope);
 
-                if (m_current != null) m_current.m_maxSlope = slope;
+                m_current.m_maxSlope = slope;
                 if (m_elevated != null) m_elevated.m_maxSlope = slope;
                 if (m_bridge != null) m_bridge.m_maxSlope = slope;
                 if (m_slope != null) m_slope.m_maxSlope = slope;
@@ -429,7 +440,7 @@ namespace FineRoadTool
             switch (m_mode)
             {
                 case Mode.Normal:
-                    if (m_straightSlope && m_roadAI.hasElevation)
+                    if (m_straightSlope)
                     {
                         m_current.m_followTerrain = false;
                         m_current.m_flattenTerrain = true;
@@ -449,7 +460,6 @@ namespace FineRoadTool
                         m_roadAI.info = m_elevated;
                         m_roadAI.elevated = m_elevated;
                         m_roadAI.bridge = null;
-                        m_roadAI.tunnel = m_elevated;
                     }
                     break;
                 case Mode.Bridge:
@@ -457,7 +467,6 @@ namespace FineRoadTool
                     {
                         m_roadAI.info = m_bridge;
                         m_roadAI.elevated = m_bridge;
-                        m_roadAI.tunnel = m_bridge;
                     }
                     break;
             }
