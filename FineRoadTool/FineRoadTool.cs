@@ -380,13 +380,25 @@ namespace FineRoadTool
 
             if (NetTool.m_nodePositionsMain.m_size > 1)
             {
-                Vector3 a = NetTool.m_nodePositionsMain.m_buffer[0].m_position;
-                Vector3 b = NetTool.m_nodePositionsMain.m_buffer[NetTool.m_nodePositionsMain.m_size - 1].m_position;
-
                 float slope = m_maxSlope;
 
                 if (m_slopeErrorCount < 5)
-                    slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / VectorUtils.LengthSqrXZ(a - b)) + 0.000001f, 0, m_maxSlope);
+                {
+                    float length = 0;
+
+                    for (int i = 0; i < NetTool.m_nodePositionsMain.m_size - 1; i++)
+                    {
+                        length += VectorUtils.LengthXZ(NetTool.m_nodePositionsMain.m_buffer[i].m_position - NetTool.m_nodePositionsMain.m_buffer[i + 1].m_position);
+                    }
+
+                    if (length != 0)
+                    {
+                        Vector3 a = NetTool.m_nodePositionsMain.m_buffer[0].m_position;
+                        Vector3 b = NetTool.m_nodePositionsMain.m_buffer[NetTool.m_nodePositionsMain.m_size - 1].m_position;
+
+                        slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / length * length) + 0.000001f, 0, m_maxSlope);
+                    }
+                }
 
                 m_current.m_maxSlope = slope;
                 if (m_elevated != null) m_elevated.m_maxSlope = slope;
