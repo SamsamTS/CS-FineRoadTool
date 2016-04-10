@@ -70,6 +70,7 @@ namespace FineRoadTool
         private bool m_activated;
         private bool m_toolEnabled;
         private bool m_bulldozeToolEnabled;
+        private int m_slopeErrorCount;
 
         public static readonly SavedInt savedElevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
@@ -277,11 +278,18 @@ namespace FineRoadTool
             {
                 bool slopeTooSteep = ((ToolBase.ToolErrors)m_buildErrors.GetValue(m_tool) & ToolBase.ToolErrors.SlopeTooSteep) != ToolBase.ToolErrors.None;
 
-                if (e.mousePosition != m_mousePosition || slopeTooSteep)
+                if (e.mousePosition != m_mousePosition)
                 {
-                    UpdateMaxSlope();
                     m_mousePosition = e.mousePosition;
+                    m_slopeErrorCount = 0;
+                    UpdateMaxSlope();
                 }
+                else if (slopeTooSteep)
+                {
+                    if (m_slopeErrorCount < 5) m_slopeErrorCount++;
+                    UpdateMaxSlope();
+                }
+                else m_slopeErrorCount = 0;
             }
         }
 
@@ -377,8 +385,8 @@ namespace FineRoadTool
 
                 float slope = m_maxSlope;
 
-                if (((ToolBase.ToolErrors)m_buildErrors.GetValue(m_tool) & ToolBase.ToolErrors.SlopeTooSteep) == ToolBase.ToolErrors.None)
-                    slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / VectorUtils.LengthSqrXZ(a - b)) + 0.01f, 0, m_maxSlope);
+                if (m_slopeErrorCount < 5)
+                    slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / VectorUtils.LengthSqrXZ(a - b)) + 0.000001f, 0, m_maxSlope);
 
                 m_current.m_maxSlope = slope;
                 if (m_elevated != null) m_elevated.m_maxSlope = slope;
