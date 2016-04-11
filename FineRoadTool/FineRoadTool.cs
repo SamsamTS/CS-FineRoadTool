@@ -410,7 +410,7 @@ namespace FineRoadTool
                         Vector3 a = NetTool.m_nodePositionsMain.m_buffer[0].m_position;
                         Vector3 b = NetTool.m_nodePositionsMain.m_buffer[NetTool.m_nodePositionsMain.m_size - 1].m_position;
 
-                        slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / length * length) + 0.000001f, 0, m_maxSlope);
+                        slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / (length * length)) + 0.000001f, 0, m_maxSlope);
                     }
                 }
 
