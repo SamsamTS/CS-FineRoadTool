@@ -2,6 +2,7 @@
 using UnityEngine;
 
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 
 using ColossalFramework;
@@ -72,6 +73,10 @@ namespace FineRoadTool
         private bool m_bulldozeToolEnabled;
         private int m_slopeErrorCount;
 
+        private int m_nodeCount;
+        private List<int> m_nodes = new List<int>();
+        private List<int> m_newNodes = new List<int>();
+
         public static readonly SavedInt savedElevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
         public static FineRoadTool instance;
@@ -93,6 +98,7 @@ namespace FineRoadTool
                 {
                     m_mode = value;
                     UpdatePrefab();
+                    m_toolOptionButton.UpdateInfo();
                 }
             }
         }
@@ -124,6 +130,7 @@ namespace FineRoadTool
                     m_straightSlope = value;
                     m_mousePosition = Vector2.zero;
                     UpdatePrefab();
+                    m_toolOptionButton.UpdateInfo();
                 }
             }
         }
@@ -192,6 +199,13 @@ namespace FineRoadTool
                         Deactivate();
                     else
                         Activate(prefab);
+                }
+
+                // Check new nodes
+                if(m_nodeCount != NetManager.instance.m_nodeCount)
+                {
+                    m_nodeCount = NetManager.instance.m_nodeCount;
+                    FixFlags();
                 }
             }
             catch (Exception e)
@@ -490,7 +504,47 @@ namespace FineRoadTool
                     }
                     break;
             }
-            m_toolOptionButton.UpdateInfo();
+        }
+
+        private void FixFlags()
+        {
+            RestorePrefab();
+            for (int i = 0; i < NetManager.instance.m_nodes.m_size; i++)
+            {
+                if ((NetManager.instance.m_nodes.m_buffer[i].m_flags & NetNode.Flags.Underground) == NetNode.Flags.Underground)
+                {
+                    NetInfo info = NetManager.instance.m_nodes.m_buffer[i].Info;
+                    if (info == null || info.m_netAI == null) return;
+
+                    RoadAIWrapper roadAI = new RoadAIWrapper(info.m_netAI);
+                    if (roadAI.hasElevation && info != roadAI.tunnel && info != roadAI.slope)
+                        NetManager.instance.m_nodes.m_buffer[i].m_flags &= ~NetNode.Flags.Underground;
+                }
+            }
+            UpdatePrefab();
+        }
+
+        private void StoreNodes()
+        {
+            m_nodes.Clear();
+            for(int i = 0; i< NetManager.instance.m_nodes.m_size; i++)
+            {
+                if (NetManager.instance.m_nodes.m_buffer[i].m_flags != NetNode.Flags.None)
+                    m_nodes.Add(i);
+            }
+        }
+
+        private void FindNewNodes()
+        {
+            m_newNodes.Clear();
+            for (int i = 0; i < NetManager.instance.m_nodes.m_size; i++)
+            {
+                if (NetManager.instance.m_nodes.m_buffer[i].m_flags != NetNode.Flags.None && !m_nodes.Contains(i))
+                {
+                    m_nodes.Add(i);
+                    m_newNodes.Add(i);
+                }
+            }
         }
 
         private void CreateToolOptionsButton()
