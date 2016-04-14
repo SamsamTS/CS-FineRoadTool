@@ -177,6 +177,9 @@ namespace FineRoadTool
             // Creating UI
             CreateToolOptionsButton();
 
+            // Fix underground flags
+            FixFlags();
+
             DebugUtils.Log("Initialized");
         }
 
@@ -199,13 +202,6 @@ namespace FineRoadTool
                         Deactivate();
                     else
                         Activate(prefab);
-                }
-
-                // Check new nodes
-                if(m_nodeCount != NetManager.instance.m_nodeCount)
-                {
-                    m_nodeCount = NetManager.instance.m_nodeCount;
-                    FixFlags();
                 }
             }
             catch (Exception e)
@@ -305,6 +301,13 @@ namespace FineRoadTool
                 }
                 else m_slopeErrorCount = 0;
             }
+
+            // Check new nodes
+            if (m_nodeCount != NetManager.instance.m_nodeCount)
+            {
+                m_nodeCount = NetManager.instance.m_nodeCount;
+                FixFlags();
+            }
         }
 
         private void Activate(NetInfo prefab)
@@ -330,6 +333,8 @@ namespace FineRoadTool
             DisableDefaultKeys();
             m_elevation = (int)m_elevationField.GetValue(m_tool);
             UpdatePrefab();
+
+            m_nodeCount = NetManager.instance.m_nodeCount;
 
             m_activated = true;
             m_toolOptionButton.isVisible = true;
@@ -508,7 +513,6 @@ namespace FineRoadTool
 
         private void FixFlags()
         {
-            RestorePrefab();
             for (int i = 0; i < NetManager.instance.m_nodes.m_size; i++)
             {
                 if ((NetManager.instance.m_nodes.m_buffer[i].m_flags & NetNode.Flags.Underground) == NetNode.Flags.Underground)
@@ -517,11 +521,10 @@ namespace FineRoadTool
                     if (info == null || info.m_netAI == null) return;
 
                     RoadAIWrapper roadAI = new RoadAIWrapper(info.m_netAI);
-                    if (roadAI.hasElevation && info != roadAI.tunnel && info != roadAI.slope)
+                    if (roadAI.hasElevation)
                         NetManager.instance.m_nodes.m_buffer[i].m_flags &= ~NetNode.Flags.Underground;
                 }
             }
-            UpdatePrefab();
         }
 
         private void StoreNodes()

@@ -90,6 +90,7 @@ namespace FineRoadTool
         private void CreateButton()
         {
             m_button = AddUIComponent<UIButton>();
+            m_button.name = "FRT_MainButton";
             m_button.size = new Vector2(36, 36);
             m_button.textScale = 0.7f;
             m_button.playAudioEvents = true;
@@ -147,6 +148,7 @@ namespace FineRoadTool
         private void CreateOptionPanel()
         {
             m_toolOptionsPanel = UIView.GetAView().AddUIComponent(typeof(UIPanel)) as UIPanel;
+            m_toolOptionsPanel.name = "FRT_ToolOptionsPanel";
             m_toolOptionsPanel.atlas = ResourceLoader.GetAtlas("Ingame");
             m_toolOptionsPanel.backgroundSprite = "SubcategoriesPanel";
             m_toolOptionsPanel.size = new Vector2(200, 180);
@@ -186,6 +188,7 @@ namespace FineRoadTool
             m_elevationStepLabel.relativePosition = new Vector2(sliderPanel.width - m_elevationStepLabel.width - 8, 10);
 
             m_elevationStepSlider = sliderPanel.AddUIComponent<UISlider>();
+            m_elevationStepSlider.name = "FRT_ElevationStepSlider";
             m_elevationStepSlider.size = new Vector2(sliderPanel.width - 20 - m_elevationStepLabel.width - 8, 18);
             m_elevationStepSlider.relativePosition = new Vector2(10, 10);
 
@@ -246,8 +249,9 @@ namespace FineRoadTool
 
             // Straight Slope
             m_straightSlope = CreateCheckBox(m_toolOptionsPanel);
+            m_straightSlope.name = "FRT_StraightSlope";
             m_straightSlope.label.text = "Straight slope";
-            m_straightSlope.tooltip = "Makes the road go straight from A to B instead of following the terrain";
+            m_straightSlope.tooltip = "Makes the road go straight from A to B instead of following the terrain\n\n" + OptionsKeymapping.toggleStraightSlope.ToLocalizedString("KEYNAME") + " to toggle straight slope";
             m_straightSlope.isChecked = false;
             m_straightSlope.relativePosition = new Vector3(8, 152);
 
@@ -292,6 +296,7 @@ namespace FineRoadTool
             checkBox.group = parent;
 
             UIButton button = checkBox.AddUIComponent<UIButton>();
+            button.name = "FRT_" + spriteName;
             button.atlas = m_atlas;
             button.relativePosition = new Vector2(0, 0);
 
