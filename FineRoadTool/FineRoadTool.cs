@@ -515,7 +515,7 @@ namespace FineRoadTool
         {
             for (int i = 0; i < NetManager.instance.m_nodes.m_size; i++)
             {
-                if ((NetManager.instance.m_nodes.m_buffer[i].m_flags & NetNode.Flags.Underground) == NetNode.Flags.Underground)
+                if ((NetManager.instance.m_nodes.m_buffer[i].m_flags & NetNode.Flags.Underground) == NetNode.Flags.Underground && (NetManager.instance.m_nodes.m_buffer[i].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
                 {
                     NetInfo info = NetManager.instance.m_nodes.m_buffer[i].Info;
                     if (info == null || info.m_netAI == null) return;
