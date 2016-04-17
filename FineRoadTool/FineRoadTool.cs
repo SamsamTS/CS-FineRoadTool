@@ -60,6 +60,7 @@ namespace FineRoadTool
         private float m_maxSlope;
         private bool m_flattenTerrain;
         private bool m_followTerrain;
+        private InfoManager.InfoMode m_infoMode = (InfoManager.InfoMode)(-1);
         #endregion
 
         private RoadAIWrapper m_roadAI;
@@ -73,20 +74,22 @@ namespace FineRoadTool
         private bool m_bulldozeToolEnabled;
         private int m_slopeErrorCount;
 
-        private int m_nodeCount;
-        private List<int> m_nodes = new List<int>();
-        private List<int> m_newNodes = new List<int>();
+        private int m_segmentCount;
+        private static Dictionary<NetInfo, RoadAIWrapper> m_roadAiDictionary;
 
         public static readonly SavedInt savedElevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
         public static FineRoadTool instance;
+
+        private static float tmp = 15f;
 
         public enum Mode
         {
             Normal,
             Ground,
             Elevated,
-            Bridge
+            Bridge,
+            Tunnel
         }
 
         public Mode mode
@@ -177,8 +180,11 @@ namespace FineRoadTool
             // Creating UI
             CreateToolOptionsButton();
 
-            // Fix underground flags
-            FixFlags();
+            // Store segment count
+            m_segmentCount = NetManager.instance.m_segmentCount;
+
+            // Init dictionary
+            InitRoadAIDictionary();
 
             DebugUtils.Log("Initialized");
         }
@@ -209,6 +215,20 @@ namespace FineRoadTool
                 enabled = false;
                 DebugUtils.Log("Update failed");
                 DebugUtils.LogException(e);
+            }
+        }
+
+        public void LateUpdate()
+        {
+            // Check if segment have been created/deleted
+            if ((isActive || m_bulldozeTool.enabled) && m_segmentCount != NetManager.instance.m_segmentCount)
+            {
+                m_segmentCount = NetManager.instance.m_segmentCount;
+
+                RestorePrefab();
+                FixTunnels();
+                FixFlags();
+                UpdatePrefab();
             }
         }
 
@@ -257,7 +277,7 @@ namespace FineRoadTool
             }
             else if (OptionsKeymapping.modesCycleRight.IsPressed(e))
             {
-                if (m_mode < Mode.Bridge)
+                if (m_mode < Mode.Tunnel)
                     mode++;
                 else
                     mode = Mode.Normal;
@@ -268,7 +288,7 @@ namespace FineRoadTool
                 if (m_mode > Mode.Normal)
                     mode--;
                 else
-                    mode = Mode.Bridge;
+                    mode = Mode.Tunnel;
                 m_toolOptionButton.UpdateInfo();
             }
             else if (OptionsKeymapping.elevationReset.IsPressed(e))
@@ -302,11 +322,17 @@ namespace FineRoadTool
                 else m_slopeErrorCount = 0;
             }
 
-            // Check new nodes
-            if (m_nodeCount != NetManager.instance.m_nodeCount)
+            if (m_mode == Mode.Tunnel && InfoManager.instance.CurrentMode != InfoManager.InfoMode.Traffic)
             {
-                m_nodeCount = NetManager.instance.m_nodeCount;
-                FixFlags();
+                if (m_infoMode == (InfoManager.InfoMode)(-1))
+                    m_infoMode = InfoManager.instance.CurrentMode;
+
+                InfoManager.instance.SetCurrentMode(InfoManager.InfoMode.Traffic, InfoManager.SubInfoMode.Default);
+            }
+            else if (m_mode != Mode.Tunnel && m_infoMode != (InfoManager.InfoMode)(-1))
+            {
+                InfoManager.instance.SetCurrentMode(m_infoMode, InfoManager.SubInfoMode.Default);
+                m_infoMode = (InfoManager.InfoMode)(-1);
             }
         }
 
@@ -334,7 +360,7 @@ namespace FineRoadTool
             m_elevation = (int)m_elevationField.GetValue(m_tool);
             UpdatePrefab();
 
-            m_nodeCount = NetManager.instance.m_nodeCount;
+            m_segmentCount = NetManager.instance.m_segmentCount;
 
             m_activated = true;
             m_toolOptionButton.isVisible = true;
@@ -508,46 +534,163 @@ namespace FineRoadTool
                         m_roadAI.elevated = m_bridge;
                     }
                     break;
+                case Mode.Tunnel:
+                    if (m_tunnel != null && m_slope != null)
+                    {
+                        m_roadAI.info = m_tunnel;
+                        m_roadAI.elevated = m_tunnel;
+                        m_roadAI.bridge = null;
+                        m_roadAI.slope = m_tunnel;
+                    }
+                    break;
             }
         }
 
-        private void FixFlags()
+        private static void InitRoadAIDictionary()
+        {
+            m_roadAiDictionary = new Dictionary<NetInfo, RoadAIWrapper>();
+
+            for (uint i = 0; i < PrefabCollection<NetInfo>.PrefabCount(); i++)
+            {
+                NetInfo info = PrefabCollection<NetInfo>.GetPrefab(i);
+
+                RoadAIWrapper roadAI = new RoadAIWrapper(info.m_netAI);
+                if (roadAI.hasElevation && !m_roadAiDictionary.ContainsKey(info))
+                {
+                    m_roadAiDictionary.Add(info, roadAI);
+
+                    if (roadAI.elevated != null && !m_roadAiDictionary.ContainsKey(roadAI.elevated))
+                        m_roadAiDictionary.Add(roadAI.elevated, roadAI);
+                    if (roadAI.bridge != null && !m_roadAiDictionary.ContainsKey(roadAI.bridge))
+                        m_roadAiDictionary.Add(roadAI.bridge, roadAI);
+                    if (roadAI.slope != null && !m_roadAiDictionary.ContainsKey(roadAI.slope))
+                        m_roadAiDictionary.Add(roadAI.slope, roadAI);
+                    if (roadAI.tunnel != null && !m_roadAiDictionary.ContainsKey(roadAI.tunnel))
+                        m_roadAiDictionary.Add(roadAI.tunnel, roadAI);
+                }
+            }
+        }
+
+        public void FixFlags()
         {
             for (int i = 0; i < NetManager.instance.m_nodes.m_size; i++)
             {
-                if ((NetManager.instance.m_nodes.m_buffer[i].m_flags & NetNode.Flags.Underground) == NetNode.Flags.Underground && (NetManager.instance.m_nodes.m_buffer[i].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
+                NetNode[] nodes = NetManager.instance.m_nodes.m_buffer;
+                if ((nodes[i].m_flags & NetNode.Flags.Underground) == NetNode.Flags.Underground && (nodes[i].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
                 {
-                    NetInfo info = NetManager.instance.m_nodes.m_buffer[i].Info;
+                    NetInfo info = nodes[i].Info;
                     if (info == null || info.m_netAI == null) return;
 
-                    RoadAIWrapper roadAI = new RoadAIWrapper(info.m_netAI);
-                    if (roadAI.hasElevation)
-                        NetManager.instance.m_nodes.m_buffer[i].m_flags &= ~NetNode.Flags.Underground;
+                    if (!m_roadAiDictionary.ContainsKey(info)) continue;
+                    RoadAIWrapper roadAI = m_roadAiDictionary[info];
+
+                    if (info != roadAI.tunnel && info != roadAI.slope)
+                        nodes[i].m_flags &= ~NetNode.Flags.Underground;
                 }
             }
         }
 
-        private void StoreNodes()
+        public static void FixTunnels()
         {
-            m_nodes.Clear();
-            for(int i = 0; i< NetManager.instance.m_nodes.m_size; i++)
-            {
-                if (NetManager.instance.m_nodes.m_buffer[i].m_flags != NetNode.Flags.None)
-                    m_nodes.Add(i);
-            }
-        }
+            NetNode[] nodes = NetManager.instance.m_nodes.m_buffer;
+            NetSegment[] segments = NetManager.instance.m_segments.m_buffer;
 
-        private void FindNewNodes()
-        {
-            m_newNodes.Clear();
-            for (int i = 0; i < NetManager.instance.m_nodes.m_size; i++)
+            for (ushort i = 0; i < NetManager.instance.m_segments.m_size; i++)
             {
-                if (NetManager.instance.m_nodes.m_buffer[i].m_flags != NetNode.Flags.None && !m_nodes.Contains(i))
+                if (segments[i].m_flags != NetSegment.Flags.None && (segments[i].m_flags & NetSegment.Flags.Untouchable) == NetSegment.Flags.None)
                 {
-                    m_nodes.Add(i);
-                    m_newNodes.Add(i);
+                    NetInfo info = segments[i].Info;
+
+                    ushort startNode = segments[i].m_startNode;
+                    ushort endNode = segments[i].m_endNode;
+
+                    if (!m_roadAiDictionary.ContainsKey(info)) continue;
+                    RoadAIWrapper roadAI = m_roadAiDictionary[info];
+
+                    // Is it a tunnel?
+                    if (info == roadAI.tunnel)
+                    {
+                        // Tunnels are underground right?
+                        nodes[startNode].m_flags |= NetNode.Flags.Underground;
+                        nodes[endNode].m_flags |= NetNode.Flags.Underground;
+
+                        if (IsEndTunnel(ref nodes[startNode]))
+                        {
+                            // Oops wrong way! Invert the segment
+                            segments[i].m_startNode = endNode;
+                            segments[i].m_endNode = startNode;
+
+                            Vector3 dir = segments[i].m_startDirection;
+
+                            segments[i].m_startDirection = segments[i].m_endDirection;
+                            segments[i].m_endDirection = dir;
+
+                            segments[i].m_flags ^= NetSegment.Flags.Invert;
+
+                            segments[i].CalculateSegment(i);
+
+                            // Make it a slope
+                            segments[i].Info = roadAI.slope;
+                            NetManager.instance.UpdateSegment(i);
+                            nodes[startNode].m_flags &= ~NetNode.Flags.Underground;
+                        }
+                        else if (IsEndTunnel(ref nodes[endNode]))
+                        {
+                            // Make it a slope
+                            segments[i].Info = roadAI.slope;
+                            NetManager.instance.UpdateSegment(i);
+                            nodes[endNode].m_flags &= ~NetNode.Flags.Underground;
+                        }
+                    }
+                    // Is it a slope?
+                    else if (info == roadAI.slope)
+                    {
+                        if (!IsEndTunnel(ref nodes[startNode]) && !IsEndTunnel(ref nodes[endNode]))
+                        {
+                            nodes[startNode].m_flags |= NetNode.Flags.Underground;
+                            nodes[endNode].m_flags |= NetNode.Flags.Underground;
+
+                            // Make it a tunnel
+                            segments[i].Info = roadAI.tunnel;
+                            segments[i].UpdateBounds(i);
+
+                            try
+                            {
+                                // Updating terrain. This can fail somehow.
+                                TerrainModify.UpdateArea(segments[i].m_bounds.min.x, segments[i].m_bounds.min.z, segments[i].m_bounds.max.x, segments[i].m_bounds.max.z, true, true, false);
+                            }
+                            catch { }
+
+                            NetManager.instance.UpdateSegment(i);
+                        }
+                    }
                 }
             }
+        }
+
+        private static bool IsEndTunnel(ref NetNode node)
+        {
+            int count = 0;
+
+            for (int i = 0; i < 8; i++)
+            {
+                int segment = node.GetSegment(i);
+                if (segment == 0 || (NetManager.instance.m_segments.m_buffer[segment].m_flags & NetSegment.Flags.Created) != NetSegment.Flags.Created) continue;
+
+                NetInfo info = NetManager.instance.m_segments.m_buffer[segment].Info;
+
+                if (!m_roadAiDictionary.ContainsKey(info)) return true;
+                RoadAIWrapper roadAI = m_roadAiDictionary[info];
+
+                if (info != roadAI.tunnel && info != roadAI.slope) return true;
+
+                count++;
+            }
+
+            if (TerrainManager.instance.SampleRawHeightSmooth(node.m_position) > node.m_position.y + 8f)
+                return false;
+
+            return count == 1;
         }
 
         private void CreateToolOptionsButton()

@@ -85,6 +85,13 @@
     <EmbeddedResource Include="Icons\NormalModeHovered.png" />
     <EmbeddedResource Include="Icons\NormalModePressed.png" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Icons\TunnelMode.png" />
+    <EmbeddedResource Include="Icons\TunnelModeDisabled.png" />
+    <EmbeddedResource Include="Icons\TunnelModeFocused.png" />
+    <EmbeddedResource Include="Icons\TunnelModeHovered.png" />
+    <EmbeddedResource Include="Icons\TunnelModePressed.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
     <PostBuildEvent>mkdir "%25LOCALAPPDATA%25\Colossal Order\Cities_Skylines\Addons\Mods\$(SolutionName)"

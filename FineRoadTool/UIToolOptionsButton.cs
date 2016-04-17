@@ -19,6 +19,7 @@ namespace FineRoadTool
         private UICheckBox m_groundModeButton;
         private UICheckBox m_elevatedModeButton;
         private UICheckBox m_bridgeModeButton;
+        private UICheckBox m_tunnelModeButton;
 
         private UICheckBox m_straightSlope;
 
@@ -36,7 +37,7 @@ namespace FineRoadTool
 
         public override void Update()
         {
-            if(parent != m_parent)
+            if (parent != m_parent)
             {
                 m_parent = parent;
                 if (parent is UIMultiStateButton)
@@ -82,6 +83,10 @@ namespace FineRoadTool
                     m_button.text += "Bdg\n";
                     m_bridgeModeButton.SimulateClick();
                     break;
+                case FineRoadTool.Mode.Tunnel:
+                    m_button.text += "Tnl\n";
+                    m_tunnelModeButton.SimulateClick();
+                    break;
             }
 
             m_button.text += FineRoadTool.instance.elevation + "m";
@@ -118,8 +123,8 @@ namespace FineRoadTool
                 m_toolOptionsPanel.isVisible = isVisible && isChecked;
                 if (isChecked)
                 {
-                    if(m_toolOptionsPanel.absolutePosition.x <0)
-                        m_toolOptionsPanel.absolutePosition = new Vector2(absolutePosition.x - 82, absolutePosition.y - 180);
+                    if (m_toolOptionsPanel.absolutePosition.x < 0)
+                        m_toolOptionsPanel.absolutePosition = new Vector2(absolutePosition.x - (m_toolOptionsPanel.width - m_button.width) / 2, absolutePosition.y - m_toolOptionsPanel.height);
 
                     m_toolOptionsPanel.absolutePosition = new Vector2(
                         Mathf.Clamp(m_toolOptionsPanel.absolutePosition.x, 0, Screen.width - m_toolOptionsPanel.width),
@@ -139,7 +144,7 @@ namespace FineRoadTool
 
         protected override void OnVisibilityChanged()
         {
-            if(m_toolOptionsPanel != null)
+            if (m_toolOptionsPanel != null)
                 m_toolOptionsPanel.isVisible = isVisible && isChecked;
         }
 
@@ -151,8 +156,9 @@ namespace FineRoadTool
             m_toolOptionsPanel.name = "FRT_ToolOptionsPanel";
             m_toolOptionsPanel.atlas = ResourceLoader.GetAtlas("Ingame");
             m_toolOptionsPanel.backgroundSprite = "SubcategoriesPanel";
-            m_toolOptionsPanel.size = new Vector2(200, 180);
+            m_toolOptionsPanel.size = new Vector2(228, 180);
             m_toolOptionsPanel.absolutePosition = new Vector2(-1000, -1000);
+            m_toolOptionsPanel.clipChildren = true;
 
             m_toolOptionsPanel.isVisible = false;
 
@@ -212,7 +218,7 @@ namespace FineRoadTool
 
             m_elevationStepSlider.eventValueChanged += (c, v) =>
             {
-                if(v != FineRoadTool.instance.elevationStep)
+                if (v != FineRoadTool.instance.elevationStep)
                 {
                     FineRoadTool.instance.elevationStep = (int)v;
                     UpdateInfo();
@@ -233,19 +239,18 @@ namespace FineRoadTool
             modePanel.size = new Vector2(m_toolOptionsPanel.width - 16, 52);
             modePanel.relativePosition = new Vector2(8, 92);
 
-            m_normalModeButton = CreateModeCheckBox(modePanel, "NormalMode", "Unmodded road placement behavior");
-            m_normalModeButton.relativePosition = new Vector2(8, 8);
+            modePanel.padding = new RectOffset(8, 8, 8, 8);
+            modePanel.autoLayoutPadding = new RectOffset(0, 4, 0, 0);
+            modePanel.autoLayoutDirection = LayoutDirection.Horizontal;
 
-            m_groundModeButton = CreateModeCheckBox(modePanel, "GroundMode", "Forces the ground to follow the elevation of the road");
-            m_groundModeButton.relativePosition = new Vector2(52, 8);
-
-            m_elevatedModeButton = CreateModeCheckBox(modePanel, "ElevatedMode", "Forces the use of elevated pieces if available");
-            m_elevatedModeButton.relativePosition = new Vector2(96, 8);
-
-            m_bridgeModeButton = CreateModeCheckBox(modePanel, "BridgeMode", "Forces the use of bridge pieces if available");
-            m_bridgeModeButton.relativePosition = new Vector2(140, 8);
+            m_normalModeButton = CreateModeCheckBox(modePanel, "NormalMode", "Normal: Unmodded road placement behavior");
+            m_groundModeButton = CreateModeCheckBox(modePanel, "GroundMode", "Ground: Forces the ground to follow the elevation of the road");
+            m_elevatedModeButton = CreateModeCheckBox(modePanel, "ElevatedMode", "Elevated: Forces the use of elevated pieces if available");
+            m_bridgeModeButton = CreateModeCheckBox(modePanel, "BridgeMode", "Bridge: Forces the use of bridge pieces if available");
+            m_tunnelModeButton = CreateModeCheckBox(modePanel, "TunnelMode", "Tunnel: Forces the use of tunnel pieces if available");
 
             m_normalModeButton.isChecked = true;
+            modePanel.autoLayout = true;
 
             // Straight Slope
             m_straightSlope = CreateCheckBox(m_toolOptionsPanel);
@@ -337,6 +342,7 @@ namespace FineRoadTool
             if (m_groundModeButton.isChecked) FineRoadTool.instance.mode = FineRoadTool.Mode.Ground;
             if (m_elevatedModeButton.isChecked) FineRoadTool.instance.mode = FineRoadTool.Mode.Elevated;
             if (m_bridgeModeButton.isChecked) FineRoadTool.instance.mode = FineRoadTool.Mode.Bridge;
+            if (m_tunnelModeButton.isChecked) FineRoadTool.instance.mode = FineRoadTool.Mode.Tunnel;
         }
 
         private void LoadResources()
@@ -362,7 +368,12 @@ namespace FineRoadTool
 				"GroundModeDisabled",
 				"GroundModeFocused",
 				"GroundModeHovered",
-				"GroundModePressed"
+				"GroundModePressed",
+				"TunnelMode",
+				"TunnelModeDisabled",
+				"TunnelModeFocused",
+				"TunnelModeHovered",
+				"TunnelModePressed"
 			};
 
             m_atlas = ResourceLoader.CreateTextureAtlas("FineRoadTool", spriteNames, "FineRoadTool.Icons.");
