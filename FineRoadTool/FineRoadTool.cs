@@ -41,29 +41,22 @@ namespace FineRoadTool
         private int m_elevation = 0;
         private int m_elevationStep = 3;
 
-        private NetTool m_tool;
+        private NetTool m_netTool;
         private BulldozeTool m_bulldozeTool;
+        private BuildingTool m_buildingTool;
 
         private FieldInfo m_buildErrors;
         private FieldInfo m_elevationField;
         private FieldInfo m_elevationUpField;
         private FieldInfo m_elevationDownField;
+        private FieldInfo m_buildingElevationField;
+        private MethodInfo m_buildingChangeElevation;
         private bool m_keyDisabled;
         private Vector2 m_mousePosition;
 
-        #region Default value storage
-        private NetInfo m_current;
-        private NetInfo m_elevated;
-        private NetInfo m_bridge;
-        private NetInfo m_slope;
-        private NetInfo m_tunnel;
-        private float m_maxSlope;
-        private bool m_flattenTerrain;
-        private bool m_followTerrain;
         private InfoManager.InfoMode m_infoMode = (InfoManager.InfoMode)(-1);
-        #endregion
 
-        private RoadAIWrapper m_roadAI;
+        private RoadPrefab m_current;
         private Mode m_mode;
         private bool m_straightSlope = false;
 
@@ -75,32 +68,20 @@ namespace FineRoadTool
         private int m_slopeErrorCount;
 
         private int m_segmentCount;
-        private static Dictionary<NetInfo, RoadAIWrapper> m_roadAiDictionary;
 
         public static readonly SavedInt savedElevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
         public static FineRoadTool instance;
 
-        private static float tmp = 15f;
-
-        public enum Mode
-        {
-            Normal,
-            Ground,
-            Elevated,
-            Bridge,
-            Tunnel
-        }
-
         public Mode mode
         {
-            get { return m_mode; }
+            get { return m_current.mode; }
             set
             {
-                if (value != m_mode)
+                if (m_current != null && value != m_current.mode)
                 {
-                    m_mode = value;
-                    UpdatePrefab();
+                    if(value != Mode.Single) m_mode = value;
+                    m_current.mode = value;
                     m_toolOptionButton.UpdateInfo();
                 }
             }
@@ -132,7 +113,7 @@ namespace FineRoadTool
                 {
                     m_straightSlope = value;
                     m_mousePosition = Vector2.zero;
-                    UpdatePrefab();
+                    m_current.Update();
                     m_toolOptionButton.UpdateInfo();
                 }
             }
@@ -143,8 +124,8 @@ namespace FineRoadTool
             instance = this;
 
             // Getting NetTool
-            m_tool = GameObject.FindObjectOfType<NetTool>();
-            if (m_tool == null)
+            m_netTool = GameObject.FindObjectOfType<NetTool>();
+            if (m_netTool == null)
             {
                 DebugUtils.Log("NetTool not found.");
                 enabled = false;
@@ -160,16 +141,27 @@ namespace FineRoadTool
                 return;
             }
 
-            // Getting NetTool private fields
-            m_buildErrors = m_tool.GetType().GetField("m_buildErrors", BindingFlags.NonPublic | BindingFlags.Instance);
-            m_elevationField = m_tool.GetType().GetField("m_elevation", BindingFlags.NonPublic | BindingFlags.Instance);
-            m_elevationUpField = m_tool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance);
-            m_elevationDownField = m_tool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance);
+            // Getting BuildingTool
+            m_buildingTool = GameObject.FindObjectOfType<BuildingTool>();
+            if (m_buildingTool == null)
+            {
+                DebugUtils.Log("BuildingTool not found.");
+                enabled = false;
+                return;
+            }
 
-            if (m_buildErrors == null || m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null)
+            // Getting NetTool private fields
+            m_buildErrors = m_netTool.GetType().GetField("m_buildErrors", BindingFlags.NonPublic | BindingFlags.Instance);
+            m_elevationField = m_netTool.GetType().GetField("m_elevation", BindingFlags.NonPublic | BindingFlags.Instance);
+            m_elevationUpField = m_netTool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance);
+            m_elevationDownField = m_netTool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance);
+            m_buildingElevationField = m_buildingTool.GetType().GetField("m_elevation", BindingFlags.NonPublic | BindingFlags.Instance);
+            m_buildingChangeElevation = m_buildingTool.GetType().GetMethod("ChangeElevation", BindingFlags.NonPublic | BindingFlags.Instance);
+
+            if (m_buildErrors == null || m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null || m_buildingElevationField == null)
             {
                 DebugUtils.Log("NetTool fields not found");
-                m_tool = null;
+                m_netTool = null;
                 enabled = false;
                 return;
             }
@@ -184,24 +176,39 @@ namespace FineRoadTool
             m_segmentCount = NetManager.instance.m_segmentCount;
 
             // Init dictionary
-            InitRoadAIDictionary();
+            RoadPrefab.Initialize();
 
             DebugUtils.Log("Initialized");
         }
 
         public void Update()
         {
-            if (m_tool == null) return;
+            if (m_netTool == null) return;
 
             try
             {
+                // Plopping intesection?
+                if (m_buildingTool.enabled && m_buildingTool.m_prefab.m_class.m_service == ItemClass.Service.Road && m_buildingTool.m_prefab.m_class.m_level == ItemClass.Level.Level5)
+                {
+                    m_toolEnabled = m_netTool.enabled;
+                    m_bulldozeToolEnabled = m_bulldozeTool.enabled;
+
+                    Deactivate();
+
+                    int elevation = (int)m_buildingElevationField.GetValue(m_buildingTool);
+                    RoadPrefab.singleMode = (elevation == 0);
+
+                    return;
+                }
+
                 // Getting selected prefab
-                NetInfo prefab = m_tool.enabled || m_bulldozeTool.enabled ? m_tool.m_prefab : null;
+                NetInfo prefab = m_netTool.enabled || m_bulldozeTool.enabled ? m_netTool.m_prefab : null;
+                NetInfo current = m_current != null ? m_current.prefab : null;
 
                 // Has the prefab/tool changed?
-                if (prefab != m_current || m_toolEnabled != m_tool.enabled || m_bulldozeToolEnabled != m_bulldozeTool.enabled)
+                if (prefab != current || m_toolEnabled != m_netTool.enabled || m_bulldozeToolEnabled != m_bulldozeTool.enabled)
                 {
-                    m_toolEnabled = m_tool.enabled;
+                    m_toolEnabled = m_netTool.enabled;
                     m_bulldozeToolEnabled = m_bulldozeTool.enabled;
 
                     if (prefab == null && !m_bulldozeTool.enabled)
@@ -225,22 +232,52 @@ namespace FineRoadTool
             {
                 m_segmentCount = NetManager.instance.m_segmentCount;
 
-                RestorePrefab();
+                m_current.Restore();
                 FixTunnels();
                 FixFlags();
-                UpdatePrefab();
+                m_current.Update();
             }
         }
 
         public void OnGUI()
         {
-            if (!isActive) return;
-
             Event e = Event.current;
+
+            if (RoadPrefab.singleMode)
+            {
+                // Checking key presses
+                if (OptionsKeymapping.elevationUp.IsPressed(e) || OptionsKeymapping.elevationDown.IsPressed(e))
+                {
+                    RoadPrefab.singleMode = false;
+                    BuildingInfo info = m_buildingTool.m_prefab;
+                    if (info != null)
+                    {
+                        // Reset cached value
+                        FieldInfo cachedMaxElevation = info.m_buildingAI.GetType().GetField("m_cachedMaxElevation", BindingFlags.NonPublic | BindingFlags.Instance);
+                        if (cachedMaxElevation != null) cachedMaxElevation.SetValue(info.m_buildingAI, -1);
+
+                        int min, max;
+                        info.m_buildingAI.GetElevationLimits(out min, out max);
+
+                        int elevation = (int)m_buildingElevationField.GetValue(m_buildingTool);
+                        elevation += OptionsKeymapping.elevationUp.IsPressed(Event.current) ? 1 : -1;
+
+                        m_buildingElevationField.SetValue(m_buildingTool, Mathf.Clamp(elevation, min, max));
+                    }
+                    e.Use();
+                }
+                return;
+            }
+            else if(m_buildingTool.enabled && OptionsKeymapping.elevationReset.IsPressed(e))
+            {
+                m_buildingElevationField.SetValue(m_buildingTool, 0);
+            }
+
+            if (!isActive) return;
 
             // Updating the elevation
             if (m_elevation >= 0 || m_elevation <= -256)
-                m_elevation = (int)m_elevationField.GetValue(m_tool);
+                m_elevation = (int)m_elevationField.GetValue(m_netTool);
             else
                 UpdateElevation();
 
@@ -277,7 +314,7 @@ namespace FineRoadTool
             }
             else if (OptionsKeymapping.modesCycleRight.IsPressed(e))
             {
-                if (m_mode < Mode.Tunnel)
+                if (m_current.mode < Mode.Tunnel)
                     mode++;
                 else
                     mode = Mode.Normal;
@@ -285,7 +322,7 @@ namespace FineRoadTool
             }
             else if (OptionsKeymapping.modesCycleLeft.IsPressed(e))
             {
-                if (m_mode > Mode.Normal)
+                if (m_current.mode > Mode.Normal)
                     mode--;
                 else
                     mode = Mode.Tunnel;
@@ -306,7 +343,7 @@ namespace FineRoadTool
 
             if (m_straightSlope)
             {
-                bool slopeTooSteep = ((ToolBase.ToolErrors)m_buildErrors.GetValue(m_tool) & ToolBase.ToolErrors.SlopeTooSteep) != ToolBase.ToolErrors.None;
+                bool slopeTooSteep = ((ToolBase.ToolErrors)m_buildErrors.GetValue(m_netTool) & ToolBase.ToolErrors.SlopeTooSteep) != ToolBase.ToolErrors.None;
 
                 if (e.mousePosition != m_mousePosition)
                 {
@@ -322,14 +359,14 @@ namespace FineRoadTool
                 else m_slopeErrorCount = 0;
             }
 
-            if (m_mode == Mode.Tunnel && InfoManager.instance.CurrentMode != InfoManager.InfoMode.Traffic)
+            if (m_current.mode == Mode.Tunnel && InfoManager.instance.CurrentMode != InfoManager.InfoMode.Traffic)
             {
                 if (m_infoMode == (InfoManager.InfoMode)(-1))
                     m_infoMode = InfoManager.instance.CurrentMode;
 
                 InfoManager.instance.SetCurrentMode(InfoManager.InfoMode.Traffic, InfoManager.SubInfoMode.Default);
             }
-            else if (m_mode != Mode.Tunnel && m_infoMode != (InfoManager.InfoMode)(-1))
+            else if (m_current.mode != Mode.Tunnel && m_infoMode != (InfoManager.InfoMode)(-1))
             {
                 InfoManager.instance.SetCurrentMode(m_infoMode, InfoManager.SubInfoMode.Default);
                 m_infoMode = (InfoManager.InfoMode)(-1);
@@ -338,17 +375,17 @@ namespace FineRoadTool
 
         private void Activate(NetInfo prefab)
         {
-            RestorePrefab();
-            m_current = prefab;
+            if (m_current != null) m_current.Restore();
+            m_current = null;
 
             if (prefab == null) return;
+            m_current = RoadPrefab.GetPrefab(prefab);
 
-            StorePrefab();
             AttachToolOptionsButton();
 
             // Is it a valid prefab?
             int min, max;
-            m_current.m_netAI.GetElevationLimits(out min, out max);
+            m_current.prefab.m_netAI.GetElevationLimits(out min, out max);
 
             if ((m_bulldozeTool.enabled || (min == 0 && max == 0)) && !m_buttonExists)
             {
@@ -357,8 +394,8 @@ namespace FineRoadTool
             }
 
             DisableDefaultKeys();
-            m_elevation = (int)m_elevationField.GetValue(m_tool);
-            UpdatePrefab();
+            m_elevation = (int)m_elevationField.GetValue(m_netTool);
+            m_current.mode = m_mode;
 
             m_segmentCount = NetManager.instance.m_segmentCount;
 
@@ -373,7 +410,7 @@ namespace FineRoadTool
         {
             if (!isActive) return;
 
-            RestorePrefab();
+            m_current.Restore();
             RestoreDefaultKeys();
 
             m_toolOptionButton.isVisible = false;
@@ -388,8 +425,8 @@ namespace FineRoadTool
 
             SavedInputKey emptyKey = new SavedInputKey("", Settings.gameSettingsFile);
 
-            m_elevationUpField.SetValue(m_tool, emptyKey);
-            m_elevationDownField.SetValue(m_tool, emptyKey);
+            m_elevationUpField.SetValue(m_netTool, emptyKey);
+            m_elevationDownField.SetValue(m_netTool, emptyKey);
 
             m_keyDisabled = true;
         }
@@ -398,8 +435,8 @@ namespace FineRoadTool
         {
             if (!m_keyDisabled) return;
 
-            m_elevationUpField.SetValue(m_tool, OptionsKeymapping.elevationUp);
-            m_elevationDownField.SetValue(m_tool, OptionsKeymapping.elevationDown);
+            m_elevationUpField.SetValue(m_netTool, OptionsKeymapping.elevationUp);
+            m_elevationDownField.SetValue(m_netTool, OptionsKeymapping.elevationDown);
 
             m_keyDisabled = false;
         }
@@ -407,14 +444,14 @@ namespace FineRoadTool
         private void UpdateElevation()
         {
             int min, max;
-            m_current.m_netAI.GetElevationLimits(out min, out max);
+            m_current.prefab.m_netAI.GetElevationLimits(out min, out max);
 
             m_elevation = Mathf.Clamp(m_elevation, min * 256, max * 256);
             if (m_elevationStep < 3) m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_elevation / (256f / 12f)) * (256f / 12f));
 
-            if ((int)m_elevationField.GetValue(m_tool) != m_elevation)
+            if ((int)m_elevationField.GetValue(m_netTool) != m_elevation)
             {
-                m_elevationField.SetValue(m_tool, m_elevation);
+                m_elevationField.SetValue(m_netTool, m_elevation);
                 m_toolOptionButton.UpdateInfo();
             }
         }
@@ -425,7 +462,7 @@ namespace FineRoadTool
 
             if (NetTool.m_nodePositionsMain.m_size > 1)
             {
-                float slope = m_maxSlope;
+                float slope = m_current.defaultSlope;
 
                 if (m_slopeErrorCount < 5)
                 {
@@ -441,133 +478,11 @@ namespace FineRoadTool
                         Vector3 a = NetTool.m_nodePositionsMain.m_buffer[0].m_position;
                         Vector3 b = NetTool.m_nodePositionsMain.m_buffer[NetTool.m_nodePositionsMain.m_size - 1].m_position;
 
-                        slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / (length * length)) + 0.000001f, 0, m_maxSlope);
+                        slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / (length * length)) + 0.000001f, 0, slope);
                     }
                 }
 
-                m_current.m_maxSlope = slope;
-                if (m_elevated != null) m_elevated.m_maxSlope = slope;
-                if (m_bridge != null) m_bridge.m_maxSlope = slope;
-                if (m_slope != null) m_slope.m_maxSlope = slope;
-                if (m_tunnel != null) m_tunnel.m_maxSlope = slope;
-            }
-        }
-
-        private void StorePrefab()
-        {
-            if (m_current == null) return;
-
-            m_followTerrain = m_current.m_followTerrain;
-            m_flattenTerrain = m_current.m_flattenTerrain;
-
-            m_maxSlope = m_current.m_maxSlope;
-
-            m_roadAI = new RoadAIWrapper(m_current.m_netAI);
-
-            if (m_roadAI.hasElevation)
-            {
-                m_elevated = m_roadAI.elevated;
-                m_bridge = m_roadAI.bridge;
-                m_slope = m_roadAI.slope;
-                m_tunnel = m_roadAI.tunnel;
-            }
-        }
-
-        private void RestorePrefab()
-        {
-            if (m_current == null) return;
-
-            m_current.m_followTerrain = m_followTerrain;
-            m_current.m_flattenTerrain = m_flattenTerrain;
-            m_current.m_maxSlope = m_maxSlope;
-
-            if (m_elevated != null) m_elevated.m_maxSlope = m_maxSlope;
-            if (m_bridge != null) m_bridge.m_maxSlope = m_maxSlope;
-            if (m_slope != null) m_slope.m_maxSlope = m_maxSlope;
-            if (m_tunnel != null) m_tunnel.m_maxSlope = m_maxSlope;
-
-            if (m_roadAI.hasElevation)
-            {
-                m_roadAI.info = m_current;
-                m_roadAI.elevated = m_elevated;
-                m_roadAI.bridge = m_bridge;
-                m_roadAI.slope = m_slope;
-                m_roadAI.tunnel = m_tunnel;
-            }
-        }
-
-        private void UpdatePrefab()
-        {
-            if (m_current == null || !m_roadAI.hasElevation) return;
-
-            RestorePrefab();
-
-            switch (m_mode)
-            {
-                case Mode.Normal:
-                    if (m_straightSlope)
-                    {
-                        m_current.m_followTerrain = false;
-                        m_current.m_flattenTerrain = true;
-                    }
-                    break;
-                case Mode.Ground:
-                    m_roadAI.elevated = m_current;
-                    m_roadAI.bridge = null;
-                    m_roadAI.slope = null;
-                    m_roadAI.tunnel = m_current;
-                    m_current.m_followTerrain = false;
-                    m_current.m_flattenTerrain = true;
-                    break;
-                case Mode.Elevated:
-                    if (m_elevated != null)
-                    {
-                        m_roadAI.info = m_elevated;
-                        m_roadAI.elevated = m_elevated;
-                        m_roadAI.bridge = null;
-                    }
-                    break;
-                case Mode.Bridge:
-                    if (m_bridge != null)
-                    {
-                        m_roadAI.info = m_bridge;
-                        m_roadAI.elevated = m_bridge;
-                    }
-                    break;
-                case Mode.Tunnel:
-                    if (m_tunnel != null && m_slope != null)
-                    {
-                        m_roadAI.info = m_tunnel;
-                        m_roadAI.elevated = m_tunnel;
-                        m_roadAI.bridge = null;
-                        m_roadAI.slope = m_tunnel;
-                    }
-                    break;
-            }
-        }
-
-        private static void InitRoadAIDictionary()
-        {
-            m_roadAiDictionary = new Dictionary<NetInfo, RoadAIWrapper>();
-
-            for (uint i = 0; i < PrefabCollection<NetInfo>.PrefabCount(); i++)
-            {
-                NetInfo info = PrefabCollection<NetInfo>.GetPrefab(i);
-
-                RoadAIWrapper roadAI = new RoadAIWrapper(info.m_netAI);
-                if (roadAI.hasElevation && !m_roadAiDictionary.ContainsKey(info))
-                {
-                    m_roadAiDictionary.Add(info, roadAI);
-
-                    if (roadAI.elevated != null && !m_roadAiDictionary.ContainsKey(roadAI.elevated))
-                        m_roadAiDictionary.Add(roadAI.elevated, roadAI);
-                    if (roadAI.bridge != null && !m_roadAiDictionary.ContainsKey(roadAI.bridge))
-                        m_roadAiDictionary.Add(roadAI.bridge, roadAI);
-                    if (roadAI.slope != null && !m_roadAiDictionary.ContainsKey(roadAI.slope))
-                        m_roadAiDictionary.Add(roadAI.slope, roadAI);
-                    if (roadAI.tunnel != null && !m_roadAiDictionary.ContainsKey(roadAI.tunnel))
-                        m_roadAiDictionary.Add(roadAI.tunnel, roadAI);
-                }
+                m_current.SetMaxSlope(slope);
             }
         }
 
@@ -581,10 +496,10 @@ namespace FineRoadTool
                     NetInfo info = nodes[i].Info;
                     if (info == null || info.m_netAI == null) return;
 
-                    if (!m_roadAiDictionary.ContainsKey(info)) continue;
-                    RoadAIWrapper roadAI = m_roadAiDictionary[info];
+                    RoadPrefab prefab = RoadPrefab.GetPrefab(info);
+                    if (prefab == null) continue;
 
-                    if (info != roadAI.tunnel && info != roadAI.slope)
+                    if (info != prefab.roadAI.tunnel && info != prefab.roadAI.slope)
                         nodes[i].m_flags &= ~NetNode.Flags.Underground;
                 }
             }
@@ -604,11 +519,11 @@ namespace FineRoadTool
                     ushort startNode = segments[i].m_startNode;
                     ushort endNode = segments[i].m_endNode;
 
-                    if (!m_roadAiDictionary.ContainsKey(info)) continue;
-                    RoadAIWrapper roadAI = m_roadAiDictionary[info];
+                    RoadPrefab prefab = RoadPrefab.GetPrefab(info);
+                    if (prefab == null) continue;
 
                     // Is it a tunnel?
-                    if (info == roadAI.tunnel)
+                    if (info == prefab.roadAI.tunnel)
                     {
                         // Tunnels are underground right?
                         nodes[startNode].m_flags |= NetNode.Flags.Underground;
@@ -630,20 +545,20 @@ namespace FineRoadTool
                             segments[i].CalculateSegment(i);
 
                             // Make it a slope
-                            segments[i].Info = roadAI.slope;
+                            segments[i].Info = prefab.roadAI.slope;
                             NetManager.instance.UpdateSegment(i);
                             nodes[startNode].m_flags &= ~NetNode.Flags.Underground;
                         }
                         else if (IsEndTunnel(ref nodes[endNode]))
                         {
                             // Make it a slope
-                            segments[i].Info = roadAI.slope;
+                            segments[i].Info = prefab.roadAI.slope;
                             NetManager.instance.UpdateSegment(i);
                             nodes[endNode].m_flags &= ~NetNode.Flags.Underground;
                         }
                     }
                     // Is it a slope?
-                    else if (info == roadAI.slope)
+                    else if (info == prefab.roadAI.slope)
                     {
                         if (!IsEndTunnel(ref nodes[startNode]) && !IsEndTunnel(ref nodes[endNode]))
                         {
@@ -651,7 +566,7 @@ namespace FineRoadTool
                             nodes[endNode].m_flags |= NetNode.Flags.Underground;
 
                             // Make it a tunnel
-                            segments[i].Info = roadAI.tunnel;
+                            segments[i].Info = prefab.roadAI.tunnel;
                             segments[i].UpdateBounds(i);
 
                             try
@@ -679,10 +594,10 @@ namespace FineRoadTool
 
                 NetInfo info = NetManager.instance.m_segments.m_buffer[segment].Info;
 
-                if (!m_roadAiDictionary.ContainsKey(info)) return true;
-                RoadAIWrapper roadAI = m_roadAiDictionary[info];
+                RoadPrefab prefab = RoadPrefab.GetPrefab(info);
+                if (prefab == null) continue;
 
-                if (info != roadAI.tunnel && info != roadAI.slope) return true;
+                if (info != prefab.roadAI.tunnel && info != prefab.roadAI.slope) return true;
 
                 count++;
             }

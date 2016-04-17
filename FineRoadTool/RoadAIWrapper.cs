@@ -2,7 +2,7 @@
 
 namespace FineRoadTool
 {
-    class RoadAIWrapper
+    public class RoadAIWrapper
     {
         private NetAI m_ai;
 

@@ -67,23 +67,23 @@ namespace FineRoadTool
 
             switch (FineRoadTool.instance.mode)
             {
-                case FineRoadTool.Mode.Normal:
+                case Mode.Normal:
                     m_button.text += "Nrm\n";
                     m_normalModeButton.SimulateClick();
                     break;
-                case FineRoadTool.Mode.Ground:
+                case Mode.Ground:
                     m_button.text += "Gnd\n";
                     m_groundModeButton.SimulateClick();
                     break;
-                case FineRoadTool.Mode.Elevated:
+                case Mode.Elevated:
                     m_button.text += "Elv\n";
                     m_elevatedModeButton.SimulateClick();
                     break;
-                case FineRoadTool.Mode.Bridge:
+                case Mode.Bridge:
                     m_button.text += "Bdg\n";
                     m_bridgeModeButton.SimulateClick();
                     break;
-                case FineRoadTool.Mode.Tunnel:
+                case Mode.Tunnel:
                     m_button.text += "Tnl\n";
                     m_tunnelModeButton.SimulateClick();
                     break;
@@ -338,11 +338,11 @@ namespace FineRoadTool
 
         private void UpdateMode()
         {
-            if (m_normalModeButton.isChecked) FineRoadTool.instance.mode = FineRoadTool.Mode.Normal;
-            if (m_groundModeButton.isChecked) FineRoadTool.instance.mode = FineRoadTool.Mode.Ground;
-            if (m_elevatedModeButton.isChecked) FineRoadTool.instance.mode = FineRoadTool.Mode.Elevated;
-            if (m_bridgeModeButton.isChecked) FineRoadTool.instance.mode = FineRoadTool.Mode.Bridge;
-            if (m_tunnelModeButton.isChecked) FineRoadTool.instance.mode = FineRoadTool.Mode.Tunnel;
+            if (m_normalModeButton.isChecked) FineRoadTool.instance.mode = Mode.Normal;
+            if (m_groundModeButton.isChecked) FineRoadTool.instance.mode = Mode.Ground;
+            if (m_elevatedModeButton.isChecked) FineRoadTool.instance.mode = Mode.Elevated;
+            if (m_bridgeModeButton.isChecked) FineRoadTool.instance.mode = Mode.Bridge;
+            if (m_tunnelModeButton.isChecked) FineRoadTool.instance.mode = Mode.Tunnel;
         }
 
         private void LoadResources()
