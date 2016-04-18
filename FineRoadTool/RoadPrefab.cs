@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+﻿using System.Collections.Generic;
 
 namespace FineRoadTool
 {
@@ -33,12 +30,11 @@ namespace FineRoadTool
 
         private static Dictionary<NetInfo, RoadPrefab> m_roadPrefabs;
         private static bool m_singleMode;
-        private static Mode m_nextMode;
 
         private RoadPrefab(NetInfo prefab)
         {
             m_roadAI = new RoadAIWrapper(prefab.m_netAI);
-            
+
             m_prefab = prefab;
 
             m_followTerrain = prefab.m_followTerrain;
@@ -82,7 +78,7 @@ namespace FineRoadTool
 
         public static RoadPrefab GetPrefab(NetInfo info)
         {
-            if (m_roadPrefabs.ContainsKey(info)) return m_roadPrefabs[info];
+            if (info != null && m_roadPrefabs.ContainsKey(info)) return m_roadPrefabs[info];
 
             return null;
         }
@@ -93,7 +89,7 @@ namespace FineRoadTool
             set
             {
                 if (value == m_singleMode) return;
-                m_singleMode = value;
+                m_singleMode = false;
 
                 foreach (RoadPrefab prefab in m_roadPrefabs.Values)
                 {
@@ -106,12 +102,22 @@ namespace FineRoadTool
                         prefab.Restore();
                     }
                 }
+
+                m_singleMode = value;
+                if (value) DebugUtils.Log("Intersection support activated");
+                else DebugUtils.Log("Intersection support deactivated");
             }
         }
 
         public void Restore()
         {
             if (m_prefab == null) return;
+
+            if (m_singleMode)
+            {
+                singleMode = false;
+                return;
+            }
 
             m_prefab.m_followTerrain = m_followTerrain;
             m_prefab.m_flattenTerrain = m_flattenTerrain;
