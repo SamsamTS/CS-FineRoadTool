@@ -212,7 +212,7 @@ namespace FineRoadTool
                 }
 
                 // Plopping intesection?
-                if (m_buildingTool.enabled && !RoadPrefab.singleMode && m_buildingTool.m_prefab.m_class.m_service == ItemClass.Service.Road && m_buildingTool.m_prefab.m_class.m_level == ItemClass.Level.Level5)
+                if (m_buildingTool.enabled && !RoadPrefab.singleMode && m_buildingTool.m_prefab != null && m_buildingTool.m_prefab.m_class != null && m_buildingTool.m_prefab.m_class.m_service == ItemClass.Service.Road && m_buildingTool.m_prefab.m_class.m_level == ItemClass.Level.Level5)
                 {
                     m_toolEnabled = m_netTool.enabled;
                     m_bulldozeToolEnabled = m_bulldozeTool.enabled;
@@ -223,7 +223,7 @@ namespace FineRoadTool
             }
             catch (Exception e)
             {
-                enabled = false;
+                m_activated = false;
                 DebugUtils.Log("Update failed");
                 DebugUtils.LogException(e);
             }
@@ -346,6 +346,7 @@ namespace FineRoadTool
             {
                 DebugUtils.Log("toggleStraightSlope");
                 straightSlope = !m_straightSlope;
+                m_toolOptionButton.UpdateInfo();
             }
 
             if (m_straightSlope)
@@ -386,9 +387,7 @@ namespace FineRoadTool
             if (prefab != null) prefab.Restore();
 
             m_current = info;
-
             prefab = RoadPrefab.GetPrefab(info);
-            if (prefab == null) return;
 
             AttachToolOptionsButton();
 
@@ -404,7 +403,7 @@ namespace FineRoadTool
 
             DisableDefaultKeys();
             m_elevation = (int)m_elevationField.GetValue(m_netTool);
-            prefab.mode = m_mode;
+            if (prefab != null) prefab.mode = m_mode;
 
             m_segmentCount = NetManager.instance.m_segmentCount;
 

@@ -95,6 +95,7 @@ namespace FineRoadTool
         private void CreateButton()
         {
             m_button = AddUIComponent<UIButton>();
+            m_button.atlas = ResourceLoader.GetAtlas("Ingame");
             m_button.name = "FRT_MainButton";
             m_button.size = new Vector2(36, 36);
             m_button.textScale = 0.7f;
