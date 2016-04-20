@@ -165,6 +165,11 @@ namespace FineRoadTool
             get { return m_hasElevation; }
         }
 
+        public bool hasVariation
+        {
+            get { return m_elevated != null || m_bridge != null || m_slope != null || m_tunnel != null; }
+        }
+
         public float defaultSlope
         {
             get { return m_maxSlope; }

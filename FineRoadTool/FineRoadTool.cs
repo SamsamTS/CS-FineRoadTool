@@ -57,11 +57,11 @@ namespace FineRoadTool
         private NetInfo m_current;
         private InfoManager.InfoMode m_infoMode = (InfoManager.InfoMode)(-1);
 
-        //private RoadAIWrapper m_roadAI;
         private Mode m_mode;
         private bool m_straightSlope = false;
 
         private UIToolOptionsButton m_toolOptionButton;
+        private UIButton m_upgradeButtonTemplate;
         private bool m_buttonExists;
         private bool m_activated;
         private bool m_toolEnabled;
@@ -173,6 +173,16 @@ namespace FineRoadTool
                 m_netTool = null;
                 enabled = false;
                 return;
+            }
+
+            // Getting Upgrade button template
+            try
+            {
+                m_upgradeButtonTemplate = GameObject.Find("RoadsSmallPanel").GetComponent<GeneratedScrollPanel>().m_OptionsBar.Find<UIButton>("Upgrade");
+            }
+            catch
+            {
+                DebugUtils.Log("Upgrade button template not found");
             }
 
             // Restoring elevation step
@@ -389,7 +399,7 @@ namespace FineRoadTool
             m_current = info;
             prefab = RoadPrefab.GetPrefab(info);
 
-            AttachToolOptionsButton();
+            AttachToolOptionsButton(prefab);
 
             // Is it a valid prefab?
             int min, max;
@@ -649,34 +659,55 @@ namespace FineRoadTool
             }
         }
 
-        private void AttachToolOptionsButton()
+        private void AttachToolOptionsButton(RoadPrefab prefab)
         {
             m_buttonExists = false;
 
-            UIPanel optionBar = UIView.Find<UIPanel>("OptionsBar");
+            RoadsOptionPanel[] panels = GameObject.FindObjectsOfType<RoadsOptionPanel>();
 
-            if (optionBar == null)
+            foreach (RoadsOptionPanel panel in panels)
             {
-                DebugUtils.Log("OptionBar not found!");
-                return;
-            }
-
-            foreach (UIComponent panel in optionBar.components)
-            {
-                if (panel is UIPanel && panel.isVisible)
+                // Find the visible RoadsOptionPanel
+                if (panel.component.isVisible)
                 {
-                    UIMultiStateButton button = panel.Find<UIMultiStateButton>("ElevationStep");
-                    if (button == null) continue;
-                    m_toolOptionButton.transform.SetParent(button.transform);
-                    button.tooltip = null;
-                    m_buttonExists = true;
+                    // Put the main button in ElevationStep
+                    UIMultiStateButton button = panel.component.Find<UIMultiStateButton>("ElevationStep");
+                    if (button != null)
+                    {
+                        m_toolOptionButton.transform.SetParent(button.transform);
+                        button.tooltip = null;
+                        m_buttonExists = true;
+                    }
+
+                    // Add Upgrade button if needed
+                    List<NetTool.Mode> list = new List<NetTool.Mode>(panel.m_Modes);
+                    if (m_upgradeButtonTemplate != null && prefab != null && prefab.hasVariation && !list.Contains(NetTool.Mode.Upgrade))
+                    {
+                        UITabstrip toolMode = panel.component.Find<UITabstrip>("ToolMode");
+                        if (toolMode != null)
+                        {
+                            list.Add(NetTool.Mode.Upgrade);
+                            panel.m_Modes = list.ToArray();
+
+                            toolMode.AddTab("Upgrade", m_upgradeButtonTemplate, false);
+
+                            DebugUtils.Log("Upgrade button added.");
+                        }
+                    }
+
                     return;
                 }
+
+                // No visible RoadsOptionPanel found. Put the main button in OptionsBar instead
+                UIPanel optionBar = UIView.Find<UIPanel>("OptionsBar");
+
+                if (optionBar == null)
+                {
+                    DebugUtils.Log("OptionBar not found!");
+                    return;
+                }
+                m_toolOptionButton.transform.SetParent(optionBar.transform);
             }
-
-            m_toolOptionButton.transform.SetParent(optionBar.transform);
-
-            DebugUtils.Log("ElevationStep not found. Absolute position: " + m_toolOptionButton.absolutePosition);
         }
     }
 }
