@@ -45,12 +45,17 @@ namespace FineRoadTool
         private BulldozeTool m_bulldozeTool;
         private BuildingTool m_buildingTool;
 
+        #region Reflection to private field/methods
         private FieldInfo m_buildErrors;
         private FieldInfo m_elevationField;
         private FieldInfo m_elevationUpField;
         private FieldInfo m_elevationDownField;
         private FieldInfo m_buildingElevationField;
         private MethodInfo m_buildingChangeElevation;
+        private FieldInfo m_controlPointsField;
+        private FieldInfo m_controlPointCountField;
+        #endregion
+
         private bool m_keyDisabled;
         private Vector2 m_mousePosition;
 
@@ -69,6 +74,7 @@ namespace FineRoadTool
         private int m_slopeErrorCount;
 
         private int m_segmentCount;
+        private int m_controlPointCount;
 
         public static readonly SavedInt savedElevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
@@ -166,6 +172,8 @@ namespace FineRoadTool
             m_elevationDownField = m_netTool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance);
             m_buildingElevationField = m_buildingTool.GetType().GetField("m_elevation", BindingFlags.NonPublic | BindingFlags.Instance);
             m_buildingChangeElevation = m_buildingTool.GetType().GetMethod("ChangeElevation", BindingFlags.NonPublic | BindingFlags.Instance);
+            m_controlPointsField = m_netTool.GetType().GetField("m_controlPoints", BindingFlags.NonPublic | BindingFlags.Instance);
+            m_controlPointCountField = m_netTool.GetType().GetField("m_controlPointCount", BindingFlags.NonPublic | BindingFlags.Instance);
 
             if (m_buildErrors == null || m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null || m_buildingElevationField == null)
             {
@@ -196,6 +204,7 @@ namespace FineRoadTool
 
             // Init dictionary
             RoadPrefab.Initialize();
+            RoadPrefab.singleMode = true;
 
             DebugUtils.Log("Initialized");
         }
@@ -222,172 +231,222 @@ namespace FineRoadTool
                 }
 
                 // Plopping intesection?
-                if (m_buildingTool.enabled && !RoadPrefab.singleMode && m_buildingTool.m_prefab != null && m_buildingTool.m_prefab.m_class != null && m_buildingTool.m_prefab.m_class.m_service == ItemClass.Service.Road && m_buildingTool.m_prefab.m_class.m_level == ItemClass.Level.Level5)
+                if (m_buildingTool.enabled && !RoadPrefab.singleMode)
                 {
-                    m_toolEnabled = m_netTool.enabled;
-                    m_bulldozeToolEnabled = m_bulldozeTool.enabled;
-
                     int elevation = (int)m_buildingElevationField.GetValue(m_buildingTool);
                     RoadPrefab.singleMode = (elevation == 0);
                 }
+                else
+                    RoadPrefab.singleMode = !m_netTool.enabled && !m_bulldozeTool.enabled;
             }
             catch (Exception e)
             {
-                m_activated = false;
                 DebugUtils.Log("Update failed");
                 DebugUtils.LogException(e);
+
+                try {
+                    Deactivate();
+                    RoadPrefab.singleMode = false;
+                }
+                catch { }
             }
+        }
+
+        public void OnDisable()
+        {
+            Deactivate();
+            RoadPrefab.singleMode = false;
         }
 
         public void LateUpdate()
         {
-            // Check if segment have been created/deleted
-            if ((isActive || m_bulldozeTool.enabled) && m_segmentCount != NetManager.instance.m_segmentCount)
+            if (!isActive && !m_bulldozeTool.enabled) return;
+
+            try
             {
-                m_segmentCount = NetManager.instance.m_segmentCount;
+                // Check if segment have been created/deleted
+                if (m_segmentCount != NetManager.instance.m_segmentCount)
+                {
+                    m_segmentCount = NetManager.instance.m_segmentCount;
 
-                RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
-                if (prefab != null) prefab.Restore();
+                    RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
+                    if (prefab != null) prefab.Restore();
 
-                FixTunnels();
-                FixFlags();
+                    FixTunnels();
+                    FixFlags();
 
-                if (prefab != null) prefab.Update();
+                    if (prefab != null) prefab.Update();
+                }
+
+                if (!isActive) return;
+
+                // Fix first control point elevation
+                int count = (int)m_controlPointCountField.GetValue(m_netTool);
+                if (count != m_controlPointCount)
+                {
+                    m_controlPointCount = count;
+
+                    if (count == 1)
+                    {
+                        m_elevation = Mathf.RoundToInt(Mathf.Round(FixFirstControlPoint()) * 256f / 12f); ;
+                        UpdateElevation();
+                        m_toolOptionButton.UpdateInfo();
+                    }
+                }
+            }
+            catch(Exception e)
+            {
+                DebugUtils.Log("LateUpdate failed");
+                DebugUtils.LogException(e);
             }
         }
 
         public void OnGUI()
         {
-            Event e = Event.current;
-
-            if (RoadPrefab.singleMode)
+            try
             {
-                // Checking key presses
-                if (OptionsKeymapping.elevationUp.IsPressed(e) || OptionsKeymapping.elevationDown.IsPressed(e))
+                Event e = Event.current;
+
+                if (m_buildingTool.enabled && RoadPrefab.singleMode)
                 {
-                    RoadPrefab.singleMode = false;
-                    BuildingInfo info = m_buildingTool.m_prefab;
-                    if (info != null)
+                    // Checking key presses
+                    if (OptionsKeymapping.elevationUp.IsPressed(e) || OptionsKeymapping.elevationDown.IsPressed(e))
                     {
-                        // Reset cached value
-                        FieldInfo cachedMaxElevation = info.m_buildingAI.GetType().GetField("m_cachedMaxElevation", BindingFlags.NonPublic | BindingFlags.Instance);
-                        if (cachedMaxElevation != null) cachedMaxElevation.SetValue(info.m_buildingAI, -1);
+                        RoadPrefab.singleMode = false;
+                        BuildingInfo info = m_buildingTool.m_prefab;
+                        if (info != null)
+                        {
+                            // Reset cached value
+                            FieldInfo cachedMaxElevation = info.m_buildingAI.GetType().GetField("m_cachedMaxElevation", BindingFlags.NonPublic | BindingFlags.Instance);
+                            if (cachedMaxElevation != null) cachedMaxElevation.SetValue(info.m_buildingAI, -1);
 
-                        int min, max;
-                        info.m_buildingAI.GetElevationLimits(out min, out max);
+                            int min, max;
+                            info.m_buildingAI.GetElevationLimits(out min, out max);
 
-                        int elevation = (int)m_buildingElevationField.GetValue(m_buildingTool);
-                        elevation += OptionsKeymapping.elevationUp.IsPressed(Event.current) ? 1 : -1;
+                            int elevation = (int)m_buildingElevationField.GetValue(m_buildingTool);
+                            elevation += OptionsKeymapping.elevationUp.IsPressed(Event.current) ? 1 : -1;
 
-                        m_buildingElevationField.SetValue(m_buildingTool, Mathf.Clamp(elevation, min, max));
+                            m_buildingElevationField.SetValue(m_buildingTool, Mathf.Clamp(elevation, min, max));
+                        }
+                        e.Use();
                     }
-                    e.Use();
+                    return;
                 }
-                return;
-            }
-            else if (m_buildingTool.enabled && OptionsKeymapping.elevationReset.IsPressed(e))
-            {
-                m_buildingElevationField.SetValue(m_buildingTool, 0);
-            }
-
-            if (!isActive) return;
-
-            // Updating the elevation
-            if (m_elevation >= 0 || m_elevation <= -256)
-                m_elevation = (int)m_elevationField.GetValue(m_netTool);
-            else
-                UpdateElevation();
-
-            // Checking key presses
-            if (OptionsKeymapping.elevationUp.IsPressed(e))
-            {
-                m_elevation += Mathf.RoundToInt(256f * m_elevationStep / 12f);
-                UpdateElevation();
-                m_mousePosition = Vector2.zero;
-            }
-            else if (OptionsKeymapping.elevationDown.IsPressed(e))
-            {
-                m_elevation -= Mathf.RoundToInt(256f * m_elevationStep / 12f);
-                UpdateElevation();
-                m_mousePosition = Vector2.zero;
-            }
-            else if (OptionsKeymapping.elevationStepUp.IsPressed(e))
-            {
-                if (m_elevationStep < 12)
+                else if (m_buildingTool.enabled && OptionsKeymapping.elevationReset.IsPressed(e))
                 {
-                    m_elevationStep++;
-                    savedElevationStep.value = m_elevationStep;
+                    m_buildingElevationField.SetValue(m_buildingTool, 0);
+                }
+
+                if (!isActive) return;
+
+                // Updating the elevation
+                if (m_elevation >= 0 || m_elevation <= -256)
+                {
+                    int currentElevation = (int)m_elevationField.GetValue(m_netTool);
+                    if (m_elevation != currentElevation)
+                    {
+                        m_elevation = currentElevation;
+                        m_toolOptionButton.UpdateInfo();
+                    }
+                }
+                else
+                    UpdateElevation();
+
+                // Checking key presses
+                if (OptionsKeymapping.elevationUp.IsPressed(e))
+                {
+                    m_elevation += Mathf.RoundToInt(256f * m_elevationStep / 12f);
+                    UpdateElevation();
+                    m_mousePosition = Vector2.zero;
+                }
+                else if (OptionsKeymapping.elevationDown.IsPressed(e))
+                {
+                    m_elevation -= Mathf.RoundToInt(256f * m_elevationStep / 12f);
+                    UpdateElevation();
+                    m_mousePosition = Vector2.zero;
+                }
+                else if (OptionsKeymapping.elevationStepUp.IsPressed(e))
+                {
+                    if (m_elevationStep < 12)
+                    {
+                        m_elevationStep++;
+                        savedElevationStep.value = m_elevationStep;
+                        m_toolOptionButton.UpdateInfo();
+                    }
+                }
+                else if (OptionsKeymapping.elevationStepDown.IsPressed(e))
+                {
+                    if (m_elevationStep > 1)
+                    {
+                        m_elevationStep--;
+                        savedElevationStep.value = m_elevationStep;
+                        m_toolOptionButton.UpdateInfo();
+                    }
+                }
+                else if (OptionsKeymapping.modesCycleRight.IsPressed(e))
+                {
+                    if (m_mode < Mode.Tunnel)
+                        mode++;
+                    else
+                        mode = Mode.Normal;
                     m_toolOptionButton.UpdateInfo();
                 }
-            }
-            else if (OptionsKeymapping.elevationStepDown.IsPressed(e))
-            {
-                if (m_elevationStep > 1)
+                else if (OptionsKeymapping.modesCycleLeft.IsPressed(e))
                 {
-                    m_elevationStep--;
-                    savedElevationStep.value = m_elevationStep;
+                    if (m_mode > Mode.Normal)
+                        mode--;
+                    else
+                        mode = Mode.Tunnel;
                     m_toolOptionButton.UpdateInfo();
                 }
-            }
-            else if (OptionsKeymapping.modesCycleRight.IsPressed(e))
-            {
-                if (m_mode < Mode.Tunnel)
-                    mode++;
-                else
-                    mode = Mode.Normal;
-                m_toolOptionButton.UpdateInfo();
-            }
-            else if (OptionsKeymapping.modesCycleLeft.IsPressed(e))
-            {
-                if (m_mode > Mode.Normal)
-                    mode--;
-                else
-                    mode = Mode.Tunnel;
-                m_toolOptionButton.UpdateInfo();
-            }
-            else if (OptionsKeymapping.elevationReset.IsPressed(e))
-            {
-                m_elevation = 0;
-                UpdateElevation();
-                m_mousePosition = Vector2.zero;
-                m_toolOptionButton.UpdateInfo();
-            }
-            else if (OptionsKeymapping.toggleStraightSlope.IsPressed(e))
-            {
-                DebugUtils.Log("toggleStraightSlope");
-                straightSlope = !m_straightSlope;
-                m_toolOptionButton.UpdateInfo();
-            }
-
-            if (m_straightSlope)
-            {
-                bool slopeTooSteep = ((ToolBase.ToolErrors)m_buildErrors.GetValue(m_netTool) & ToolBase.ToolErrors.SlopeTooSteep) != ToolBase.ToolErrors.None;
-
-                if (e.mousePosition != m_mousePosition)
+                else if (OptionsKeymapping.elevationReset.IsPressed(e))
                 {
-                    m_mousePosition = e.mousePosition;
-                    m_slopeErrorCount = 0;
-                    UpdateMaxSlope();
+                    m_elevation = 0;
+                    UpdateElevation();
+                    m_mousePosition = Vector2.zero;
+                    m_toolOptionButton.UpdateInfo();
                 }
-                else if (slopeTooSteep)
+                else if (OptionsKeymapping.toggleStraightSlope.IsPressed(e))
                 {
-                    if (m_slopeErrorCount < 5) m_slopeErrorCount++;
-                    UpdateMaxSlope();
+                    straightSlope = !m_straightSlope;
+                    m_toolOptionButton.UpdateInfo();
                 }
-                else m_slopeErrorCount = 0;
-            }
 
-            if (m_mode == Mode.Tunnel && InfoManager.instance.CurrentMode != InfoManager.InfoMode.Traffic)
-            {
-                if (m_infoMode == (InfoManager.InfoMode)(-1))
-                    m_infoMode = InfoManager.instance.CurrentMode;
+                if (m_straightSlope)
+                {
+                    bool slopeTooSteep = ((ToolBase.ToolErrors)m_buildErrors.GetValue(m_netTool) & ToolBase.ToolErrors.SlopeTooSteep) != ToolBase.ToolErrors.None;
 
-                InfoManager.instance.SetCurrentMode(InfoManager.InfoMode.Traffic, InfoManager.SubInfoMode.Default);
+                    if (e.mousePosition != m_mousePosition)
+                    {
+                        m_mousePosition = e.mousePosition;
+                        m_slopeErrorCount = 0;
+                        UpdateMaxSlope();
+                    }
+                    else if (slopeTooSteep)
+                    {
+                        if (m_slopeErrorCount < 5) m_slopeErrorCount++;
+                        UpdateMaxSlope();
+                    }
+                    else m_slopeErrorCount = 0;
+                }
+
+                if (m_mode == Mode.Tunnel && InfoManager.instance.CurrentMode != InfoManager.InfoMode.Traffic)
+                {
+                    if (m_infoMode == (InfoManager.InfoMode)(-1))
+                        m_infoMode = InfoManager.instance.CurrentMode;
+
+                    InfoManager.instance.SetCurrentMode(InfoManager.InfoMode.Traffic, InfoManager.SubInfoMode.Default);
+                }
+                else if (m_mode != Mode.Tunnel && m_infoMode != (InfoManager.InfoMode)(-1))
+                {
+                    InfoManager.instance.SetCurrentMode(m_infoMode, InfoManager.SubInfoMode.Default);
+                    m_infoMode = (InfoManager.InfoMode)(-1);
+                }
             }
-            else if (m_mode != Mode.Tunnel && m_infoMode != (InfoManager.InfoMode)(-1))
+            catch(Exception e)
             {
-                InfoManager.instance.SetCurrentMode(m_infoMode, InfoManager.SubInfoMode.Default);
-                m_infoMode = (InfoManager.InfoMode)(-1);
+                DebugUtils.Log("OnGUI failed");
+                DebugUtils.LogException(e);
             }
         }
 
@@ -416,6 +475,7 @@ namespace FineRoadTool
             if (prefab != null) prefab.mode = m_mode;
 
             m_segmentCount = NetManager.instance.m_segmentCount;
+            m_controlPointCount = 0;
 
             m_activated = true;
             m_toolOptionButton.isVisible = true;
@@ -434,7 +494,9 @@ namespace FineRoadTool
 
             RestoreDefaultKeys();
 
-            m_toolOptionButton.isVisible = false;
+            if (m_toolOptionButton!= null)
+                m_toolOptionButton.isVisible = false;
+
             m_activated = false;
 
             DebugUtils.Log("Deactivated");
@@ -524,7 +586,17 @@ namespace FineRoadTool
                     if (prefab == null) continue;
 
                     if (info != prefab.roadAI.tunnel && info != prefab.roadAI.slope)
+                    {
+                        nodes[i].m_elevation = 0;
                         nodes[i].m_flags &= ~NetNode.Flags.Underground;
+
+                        try
+                        {
+                            // Updating terrain
+                            TerrainModify.UpdateArea(nodes[i].m_bounds.min.x, nodes[i].m_bounds.min.z, nodes[i].m_bounds.max.x, nodes[i].m_bounds.max.z, true, true, false);
+                        }
+                        catch { }
+                    }
                 }
             }
         }
@@ -549,10 +621,11 @@ namespace FineRoadTool
                     // Is it a tunnel?
                     if (info == prefab.roadAI.tunnel)
                     {
-                        // Tunnels are underground right?
+                        // Make sure tunnels have underground flag
                         nodes[startNode].m_flags |= NetNode.Flags.Underground;
                         nodes[endNode].m_flags |= NetNode.Flags.Underground;
 
+                        // Convert tunnel entrance?
                         if (IsEndTunnel(ref nodes[startNode]))
                         {
                             // Oops wrong way! Invert the segment
@@ -584,6 +657,7 @@ namespace FineRoadTool
                     // Is it a slope?
                     else if (info == prefab.roadAI.slope)
                     {
+                        // Convert to tunnel?
                         if (!IsEndTunnel(ref nodes[startNode]) && !IsEndTunnel(ref nodes[endNode]))
                         {
                             nodes[startNode].m_flags |= NetNode.Flags.Underground;
@@ -605,6 +679,34 @@ namespace FineRoadTool
                     }
                 }
             }
+        }
+
+        private float FixFirstControlPoint()
+        {
+            NetTool.ControlPoint[] controlPoints = m_controlPointsField.GetValue(m_netTool) as NetTool.ControlPoint[];
+            if (controlPoints == null) return 0;
+            
+            NetInfo info = m_current;
+
+            if (controlPoints[0].m_node != 0)
+            {
+                info = NetManager.instance.m_nodes.m_buffer[controlPoints[0].m_node].Info;
+                if (info == null) info = m_current;
+            }
+            else if (controlPoints[0].m_segment != 0)
+            {
+                info = NetManager.instance.m_segments.m_buffer[controlPoints[0].m_segment].Info;
+                if (info == null) info = m_current;
+            }
+
+            float pointElevation = controlPoints[0].m_position.y - NetSegment.SampleTerrainHeight(info, controlPoints[0].m_position, false, 0f);
+            if (pointElevation > -1f && pointElevation < 1f) return 0;
+
+            controlPoints[0].m_elevation = pointElevation;
+
+            DebugUtils.Log("ControlPoint fixed");
+
+            return controlPoints[0].m_elevation;
         }
 
         private static bool IsEndTunnel(ref NetNode node)

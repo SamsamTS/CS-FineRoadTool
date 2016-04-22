@@ -104,8 +104,6 @@ namespace FineRoadTool
                 }
 
                 m_singleMode = value;
-                if (value) DebugUtils.Log("Intersection support activated");
-                else DebugUtils.Log("Intersection support deactivated");
             }
         }
 
