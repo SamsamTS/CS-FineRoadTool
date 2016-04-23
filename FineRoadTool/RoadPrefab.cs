@@ -60,7 +60,7 @@ namespace FineRoadTool
                 NetInfo info = PrefabCollection<NetInfo>.GetPrefab(i);
 
                 RoadPrefab prefab = new RoadPrefab(info);
-                if (prefab.m_hasElevation && !m_roadPrefabs.ContainsKey(info))
+                if (prefab.m_hasElevation && prefab.isValid() && !m_roadPrefabs.ContainsKey(info))
                 {
                     m_roadPrefabs.Add(info, prefab);
 
@@ -105,6 +105,11 @@ namespace FineRoadTool
 
                 m_singleMode = value;
             }
+        }
+
+        public bool isValid()
+        {
+            return m_slope != null || m_tunnel == null;
         }
 
         public void Restore()
@@ -192,7 +197,7 @@ namespace FineRoadTool
             switch (m_mode)
             {
                 case Mode.Normal:
-                    if (FineRoadTool.instance.straightSlope)
+                    if (FineRoadTool.instance.straightSlope && m_prefab.m_netAI.IsOverground())
                     {
                         m_prefab.m_followTerrain = false;
                         m_prefab.m_flattenTerrain = true;
@@ -235,8 +240,11 @@ namespace FineRoadTool
                     m_roadAI.bridge = null;
                     m_roadAI.slope = null;
                     m_roadAI.tunnel = null;
-                    m_prefab.m_followTerrain = false;
-                    m_prefab.m_flattenTerrain = true;
+                    if (m_prefab.m_netAI.IsOverground())
+                    {
+                        m_prefab.m_followTerrain = false;
+                        m_prefab.m_flattenTerrain = true;
+                    }
                     break;
             }
         }

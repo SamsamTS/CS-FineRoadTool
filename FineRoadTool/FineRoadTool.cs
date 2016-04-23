@@ -79,7 +79,7 @@ namespace FineRoadTool
         public static readonly SavedInt savedElevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
         public static FineRoadTool instance;
-        
+
         public Mode mode
         {
             get { return m_mode; }
@@ -244,7 +244,8 @@ namespace FineRoadTool
                 DebugUtils.Log("Update failed");
                 DebugUtils.LogException(e);
 
-                try {
+                try
+                {
                     Deactivate();
                     RoadPrefab.singleMode = false;
                 }
@@ -282,19 +283,15 @@ namespace FineRoadTool
 
                 // Fix first control point elevation
                 int count = (int)m_controlPointCountField.GetValue(m_netTool);
-                if (count != m_controlPointCount)
+                if (count != m_controlPointCount && m_controlPointCount == 0 && count == 1)
                 {
-                    m_controlPointCount = count;
-
-                    if (count == 1)
-                    {
-                        m_elevation = Mathf.RoundToInt(Mathf.Round(FixFirstControlPoint()) * 256f / 12f); ;
-                        UpdateElevation();
-                        m_toolOptionButton.UpdateInfo();
-                    }
+                    m_elevation = Mathf.RoundToInt(Mathf.Round(FixFirstControlPoint()) * 256f / 12f); ;
+                    UpdateElevation();
+                    m_toolOptionButton.UpdateInfo();
                 }
+                m_controlPointCount = count;
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 DebugUtils.Log("LateUpdate failed");
                 DebugUtils.LogException(e);
@@ -443,7 +440,7 @@ namespace FineRoadTool
                     m_infoMode = (InfoManager.InfoMode)(-1);
                 }
             }
-            catch(Exception e)
+            catch (Exception e)
             {
                 DebugUtils.Log("OnGUI failed");
                 DebugUtils.LogException(e);
@@ -494,7 +491,7 @@ namespace FineRoadTool
 
             RestoreDefaultKeys();
 
-            if (m_toolOptionButton!= null)
+            if (m_toolOptionButton != null)
                 m_toolOptionButton.isVisible = false;
 
             m_activated = false;
@@ -585,10 +582,12 @@ namespace FineRoadTool
                     RoadPrefab prefab = RoadPrefab.GetPrefab(info);
                     if (prefab == null) continue;
 
-                    if (info != prefab.roadAI.tunnel && info != prefab.roadAI.slope)
+                    if (info != prefab.roadAI.tunnel && info != prefab.roadAI.slope && !info.m_netAI.IsUnderground())
                     {
                         nodes[i].m_elevation = 0;
                         nodes[i].m_flags &= ~NetNode.Flags.Underground;
+
+                        DebugUtils.Log("Prout");
 
                         try
                         {
@@ -622,8 +621,11 @@ namespace FineRoadTool
                     if (info == prefab.roadAI.tunnel)
                     {
                         // Make sure tunnels have underground flag
-                        nodes[startNode].m_flags |= NetNode.Flags.Underground;
-                        nodes[endNode].m_flags |= NetNode.Flags.Underground;
+                        if ((nodes[startNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
+                            nodes[startNode].m_flags |= NetNode.Flags.Underground;
+
+                        if ((nodes[endNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
+                            nodes[endNode].m_flags |= NetNode.Flags.Underground;
 
                         // Convert tunnel entrance?
                         if (IsEndTunnel(ref nodes[startNode]))
@@ -644,14 +646,18 @@ namespace FineRoadTool
                             // Make it a slope
                             segments[i].Info = prefab.roadAI.slope;
                             NetManager.instance.UpdateSegment(i);
-                            nodes[startNode].m_flags &= ~NetNode.Flags.Underground;
+
+                            if ((nodes[startNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
+                                nodes[startNode].m_flags &= ~NetNode.Flags.Underground;
                         }
                         else if (IsEndTunnel(ref nodes[endNode]))
                         {
                             // Make it a slope
                             segments[i].Info = prefab.roadAI.slope;
                             NetManager.instance.UpdateSegment(i);
-                            nodes[endNode].m_flags &= ~NetNode.Flags.Underground;
+
+                            if ((nodes[endNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
+                                nodes[endNode].m_flags &= ~NetNode.Flags.Underground;
                         }
                     }
                     // Is it a slope?
@@ -660,8 +666,10 @@ namespace FineRoadTool
                         // Convert to tunnel?
                         if (!IsEndTunnel(ref nodes[startNode]) && !IsEndTunnel(ref nodes[endNode]))
                         {
-                            nodes[startNode].m_flags |= NetNode.Flags.Underground;
-                            nodes[endNode].m_flags |= NetNode.Flags.Underground;
+                            if ((nodes[startNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
+                                nodes[startNode].m_flags |= NetNode.Flags.Underground;
+                            if ((nodes[endNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
+                                nodes[endNode].m_flags |= NetNode.Flags.Underground;
 
                             // Make it a tunnel
                             segments[i].Info = prefab.roadAI.tunnel;
@@ -685,7 +693,7 @@ namespace FineRoadTool
         {
             NetTool.ControlPoint[] controlPoints = m_controlPointsField.GetValue(m_netTool) as NetTool.ControlPoint[];
             if (controlPoints == null) return 0;
-            
+
             NetInfo info = m_current;
 
             if (controlPoints[0].m_node != 0)
@@ -711,6 +719,9 @@ namespace FineRoadTool
 
         private static bool IsEndTunnel(ref NetNode node)
         {
+            if ((node.m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.Untouchable && (node.m_flags & NetNode.Flags.Underground) == NetNode.Flags.Underground)
+                return false;
+
             int count = 0;
 
             for (int i = 0; i < 8; i++)
@@ -719,7 +730,7 @@ namespace FineRoadTool
                 if (segment == 0 || (NetManager.instance.m_segments.m_buffer[segment].m_flags & NetSegment.Flags.Created) != NetSegment.Flags.Created) continue;
 
                 NetInfo info = NetManager.instance.m_segments.m_buffer[segment].Info;
-                
+
                 RoadPrefab prefab = RoadPrefab.GetPrefab(info);
                 if (prefab == null) return true;
 
