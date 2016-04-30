@@ -50,6 +50,6 @@ namespace FineRoadTool
             }
         }
 
-        public const string version = "0.9.6";
+        public const string version = "0.9.7";
     }
 }

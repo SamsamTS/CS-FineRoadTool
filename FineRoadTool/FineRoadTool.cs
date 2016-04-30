@@ -285,7 +285,8 @@ namespace FineRoadTool
                 int count = (int)m_controlPointCountField.GetValue(m_netTool);
                 if (count != m_controlPointCount && m_controlPointCount == 0 && count == 1)
                 {
-                    m_elevation = Mathf.RoundToInt(Mathf.Round(FixFirstControlPoint()) * 256f / 12f); ;
+                    float elevation = FixFirstControlPoint();
+                    m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(elevation / m_elevationStep) * m_elevationStep * 256f / 12f);
                     UpdateElevation();
                     m_toolOptionButton.UpdateInfo();
                 }
@@ -586,9 +587,7 @@ namespace FineRoadTool
                     {
                         nodes[i].m_elevation = 0;
                         nodes[i].m_flags &= ~NetNode.Flags.Underground;
-
-                        DebugUtils.Log("Prout");
-
+                        
                         try
                         {
                             // Updating terrain
@@ -696,19 +695,25 @@ namespace FineRoadTool
 
             NetInfo info = m_current;
 
+            // Pulling from a node?
             if (controlPoints[0].m_node != 0)
             {
                 info = NetManager.instance.m_nodes.m_buffer[controlPoints[0].m_node].Info;
                 if (info == null) info = m_current;
             }
+            // Pulling from a segment?
             else if (controlPoints[0].m_segment != 0)
             {
                 info = NetManager.instance.m_segments.m_buffer[controlPoints[0].m_segment].Info;
                 if (info == null) info = m_current;
             }
+            else
+            {
+                return controlPoints[0].m_elevation;
+            }
 
             float pointElevation = controlPoints[0].m_position.y - NetSegment.SampleTerrainHeight(info, controlPoints[0].m_position, false, 0f);
-            if (pointElevation > -1f && pointElevation < 1f) return 0;
+            if (pointElevation > -1f && pointElevation < 1f) return controlPoints[0].m_elevation;
 
             controlPoints[0].m_elevation = pointElevation;
 
