@@ -51,8 +51,6 @@ namespace FineRoadTool
         private FieldInfo m_elevationUpField;
         private FieldInfo m_elevationDownField;
         private FieldInfo m_buildingElevationField;
-        private MethodInfo m_buildingChangeElevation;
-        private FieldInfo m_controlPointsField;
         private FieldInfo m_controlPointCountField;
         #endregion
 
@@ -75,6 +73,8 @@ namespace FineRoadTool
 
         private int m_segmentCount;
         private int m_controlPointCount;
+        private NetTool.ControlPoint[] m_controlPoints;
+        private NetTool.ControlPoint[] m_cachedControlPoints;
 
         public static readonly SavedInt savedElevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
@@ -171,11 +171,9 @@ namespace FineRoadTool
             m_elevationUpField = m_netTool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance);
             m_elevationDownField = m_netTool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance);
             m_buildingElevationField = m_buildingTool.GetType().GetField("m_elevation", BindingFlags.NonPublic | BindingFlags.Instance);
-            m_buildingChangeElevation = m_buildingTool.GetType().GetMethod("ChangeElevation", BindingFlags.NonPublic | BindingFlags.Instance);
-            m_controlPointsField = m_netTool.GetType().GetField("m_controlPoints", BindingFlags.NonPublic | BindingFlags.Instance);
             m_controlPointCountField = m_netTool.GetType().GetField("m_controlPointCount", BindingFlags.NonPublic | BindingFlags.Instance);
 
-            if (m_buildErrors == null || m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null || m_buildingElevationField == null)
+            if (m_buildErrors == null || m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null || m_buildingElevationField == null || m_controlPointCountField == null)
             {
                 DebugUtils.Log("NetTool fields not found");
                 m_netTool = null;
@@ -202,9 +200,23 @@ namespace FineRoadTool
             // Store segment count
             m_segmentCount = NetManager.instance.m_segmentCount;
 
+            // Getting control points
+            try
+            {
+                m_controlPoints = m_netTool.GetType().GetField("m_controlPoints", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_netTool) as NetTool.ControlPoint[];
+                m_cachedControlPoints = m_netTool.GetType().GetField("m_cachedControlPoints", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(m_netTool) as NetTool.ControlPoint[];
+            }
+            catch
+            {
+                DebugUtils.Log("ControlPoints not found");
+            }
+
             // Init dictionary
             RoadPrefab.Initialize();
             RoadPrefab.singleMode = true;
+
+            // Fix nodes
+            FixNodes();
 
             DebugUtils.Log("Initialized");
         }
@@ -274,7 +286,7 @@ namespace FineRoadTool
                     if (prefab != null) prefab.Restore();
 
                     FixTunnels();
-                    FixFlags();
+                    FixNodes();
 
                     if (prefab != null) prefab.Update();
                 }
@@ -285,10 +297,17 @@ namespace FineRoadTool
                 int count = (int)m_controlPointCountField.GetValue(m_netTool);
                 if (count != m_controlPointCount && m_controlPointCount == 0 && count == 1)
                 {
-                    float elevation = FixFirstControlPoint();
-                    m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(elevation / m_elevationStep) * m_elevationStep * 256f / 12f);
-                    UpdateElevation();
-                    m_toolOptionButton.UpdateInfo();
+                    if (FixControlPoint(0))
+                    {
+                        m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_controlPoints[0].m_elevation / m_elevationStep) * m_elevationStep * 256f / 12f);
+                        UpdateElevation();
+                        m_toolOptionButton.UpdateInfo();
+                    }
+                }
+                // Fix last control point elevation
+                else if (count == ((m_netTool.m_mode == NetTool.Mode.Curved || m_netTool.m_mode == NetTool.Mode.Freeform) ? 2 : 1))
+                {
+                    FixControlPoint(count);
                 }
                 m_controlPointCount = count;
             }
@@ -570,14 +589,18 @@ namespace FineRoadTool
             }
         }
 
-        public void FixFlags()
+        public static void FixNodes()
         {
+            NetNode[] nodes = NetManager.instance.m_nodes.m_buffer;
+
             for (int i = 0; i < NetManager.instance.m_nodes.m_size; i++)
             {
-                NetNode[] nodes = NetManager.instance.m_nodes.m_buffer;
-                if ((nodes[i].m_flags & NetNode.Flags.Underground) == NetNode.Flags.Underground && (nodes[i].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
+                if(nodes[i].m_flags == NetNode.Flags.None || (nodes[i].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.Untouchable) continue;
+
+                NetInfo info = nodes[i].Info;
+
+                if ((nodes[i].m_flags & NetNode.Flags.Underground) == NetNode.Flags.Underground)
                 {
-                    NetInfo info = nodes[i].Info;
                     if (info == null || info.m_netAI == null) continue;
 
                     RoadPrefab prefab = RoadPrefab.GetPrefab(info);
@@ -586,14 +609,26 @@ namespace FineRoadTool
                     if (info != prefab.roadAI.tunnel && info != prefab.roadAI.slope && !info.m_netAI.IsUnderground())
                     {
                         nodes[i].m_elevation = 0;
-                        nodes[i].m_flags &= ~NetNode.Flags.Underground;
-                        
+                        nodes[i].m_flags = nodes[i].m_flags & ~NetNode.Flags.Underground;
+
                         try
                         {
                             // Updating terrain
                             TerrainModify.UpdateArea(nodes[i].m_bounds.min.x, nodes[i].m_bounds.min.z, nodes[i].m_bounds.max.x, nodes[i].m_bounds.max.z, true, true, false);
                         }
                         catch { }
+                    }
+                }
+                else if (info != null)
+                {
+                    float pointElevation = nodes[i].m_position.y - NetSegment.SampleTerrainHeight(info, nodes[i].m_position, false, 0f);
+
+                    if (pointElevation < 0) continue;
+                    float diff = nodes[i].m_elevation - pointElevation;
+
+                    if (diff <= -1f || diff >= 1f)
+                    {
+                        nodes[i].m_elevation = (byte)Mathf.RoundToInt(pointElevation);
                     }
                 }
             }
@@ -621,10 +656,10 @@ namespace FineRoadTool
                     {
                         // Make sure tunnels have underground flag
                         if ((nodes[startNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
-                            nodes[startNode].m_flags |= NetNode.Flags.Underground;
+                            nodes[startNode].m_flags = nodes[startNode].m_flags | NetNode.Flags.Underground;
 
                         if ((nodes[endNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
-                            nodes[endNode].m_flags |= NetNode.Flags.Underground;
+                            nodes[endNode].m_flags = nodes[endNode].m_flags | NetNode.Flags.Underground;
 
                         // Convert tunnel entrance?
                         if (IsEndTunnel(ref nodes[startNode]))
@@ -638,7 +673,7 @@ namespace FineRoadTool
                             segments[i].m_startDirection = segments[i].m_endDirection;
                             segments[i].m_endDirection = dir;
 
-                            segments[i].m_flags ^= NetSegment.Flags.Invert;
+                            segments[i].m_flags = segments[i].m_flags ^ NetSegment.Flags.Invert;
 
                             segments[i].CalculateSegment(i);
 
@@ -647,7 +682,7 @@ namespace FineRoadTool
                             NetManager.instance.UpdateSegment(i);
 
                             if ((nodes[startNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
-                                nodes[startNode].m_flags &= ~NetNode.Flags.Underground;
+                                nodes[startNode].m_flags = nodes[startNode].m_flags & ~NetNode.Flags.Underground;
                         }
                         else if (IsEndTunnel(ref nodes[endNode]))
                         {
@@ -656,7 +691,7 @@ namespace FineRoadTool
                             NetManager.instance.UpdateSegment(i);
 
                             if ((nodes[endNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
-                                nodes[endNode].m_flags &= ~NetNode.Flags.Underground;
+                                nodes[endNode].m_flags = nodes[endNode].m_flags & ~NetNode.Flags.Underground;
                         }
                     }
                     // Is it a slope?
@@ -666,9 +701,9 @@ namespace FineRoadTool
                         if (!IsEndTunnel(ref nodes[startNode]) && !IsEndTunnel(ref nodes[endNode]))
                         {
                             if ((nodes[startNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
-                                nodes[startNode].m_flags |= NetNode.Flags.Underground;
+                                nodes[startNode].m_flags = nodes[startNode].m_flags | NetNode.Flags.Underground;
                             if ((nodes[endNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
-                                nodes[endNode].m_flags |= NetNode.Flags.Underground;
+                                nodes[endNode].m_flags = nodes[endNode].m_flags | NetNode.Flags.Underground;
 
                             // Make it a tunnel
                             segments[i].Info = prefab.roadAI.tunnel;
@@ -683,43 +718,42 @@ namespace FineRoadTool
 
                             NetManager.instance.UpdateSegment(i);
                         }
-                    }
+                    } 
                 }
             }
         }
 
-        private float FixFirstControlPoint()
+        private bool FixControlPoint(int point)
         {
-            NetTool.ControlPoint[] controlPoints = m_controlPointsField.GetValue(m_netTool) as NetTool.ControlPoint[];
-            if (controlPoints == null) return 0;
+            if (m_controlPoints == null) return false;
 
             NetInfo info = m_current;
 
             // Pulling from a node?
-            if (controlPoints[0].m_node != 0)
+            if (m_controlPoints[point].m_node != 0)
             {
-                info = NetManager.instance.m_nodes.m_buffer[controlPoints[0].m_node].Info;
+                info = NetManager.instance.m_nodes.m_buffer[m_controlPoints[point].m_node].Info;
                 if (info == null) info = m_current;
             }
             // Pulling from a segment?
-            else if (controlPoints[0].m_segment != 0)
+            else if (m_controlPoints[point].m_segment != 0)
             {
-                info = NetManager.instance.m_segments.m_buffer[controlPoints[0].m_segment].Info;
+                info = NetManager.instance.m_segments.m_buffer[m_controlPoints[point].m_segment].Info;
                 if (info == null) info = m_current;
             }
-            else
+            else return false;
+
+            float pointElevation = m_controlPoints[point].m_position.y - NetSegment.SampleTerrainHeight(info, m_controlPoints[point].m_position, false, 0f);
+            float diff = pointElevation - m_controlPoints[point].m_elevation;
+
+            // Are we off?
+            if (diff <= -1f || diff >= 1f)
             {
-                return controlPoints[0].m_elevation;
+                m_controlPoints[point].m_elevation = pointElevation;
+                m_cachedControlPoints[point].m_elevation = pointElevation;
             }
 
-            float pointElevation = controlPoints[0].m_position.y - NetSegment.SampleTerrainHeight(info, controlPoints[0].m_position, false, 0f);
-            if (pointElevation > -1f && pointElevation < 1f) return controlPoints[0].m_elevation;
-
-            controlPoints[0].m_elevation = pointElevation;
-
-            DebugUtils.Log("ControlPoint fixed");
-
-            return controlPoints[0].m_elevation;
+            return true;
         }
 
         private static bool IsEndTunnel(ref NetNode node)
