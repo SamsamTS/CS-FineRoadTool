@@ -70,6 +70,7 @@ namespace FineRoadTool
         private bool m_toolEnabled;
         private bool m_bulldozeToolEnabled;
         private int m_slopeErrorCount;
+        private bool m_init;
 
         private int m_segmentCount;
         private int m_controlPointCount;
@@ -212,11 +213,7 @@ namespace FineRoadTool
             }
 
             // Init dictionary
-            RoadPrefab.Initialize();
-            RoadPrefab.singleMode = true;
-
-            // Fix nodes
-            FixNodes();
+            m_init = true;
 
             DebugUtils.Log("Initialized");
         }
@@ -273,6 +270,14 @@ namespace FineRoadTool
 
         public void LateUpdate()
         {
+            if(m_init)
+            {
+                m_init = false;
+                RoadPrefab.Initialize();
+                RoadPrefab.singleMode = true;
+                FixNodes();
+            }
+
             if (!isActive && !m_bulldozeTool.enabled) return;
 
             try
@@ -597,10 +602,9 @@ namespace FineRoadTool
             {
                 if(nodes[i].m_flags == NetNode.Flags.None || (nodes[i].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.Untouchable) continue;
 
-                NetInfo info = nodes[i].Info;
-
                 if ((nodes[i].m_flags & NetNode.Flags.Underground) == NetNode.Flags.Underground)
                 {
+                    NetInfo info = nodes[i].Info;
                     if (info == null || info.m_netAI == null) continue;
 
                     RoadPrefab prefab = RoadPrefab.GetPrefab(info);
@@ -619,7 +623,7 @@ namespace FineRoadTool
                         catch { }
                     }
                 }
-                else if (info != null)
+                /*else if (info != null)
                 {
                     float pointElevation = nodes[i].m_position.y - NetSegment.SampleTerrainHeight(info, nodes[i].m_position, false, 0f);
 
@@ -630,7 +634,7 @@ namespace FineRoadTool
                     {
                         nodes[i].m_elevation = (byte)Mathf.RoundToInt(pointElevation);
                     }
-                }
+                }*/
             }
         }
 
