@@ -2,6 +2,7 @@
 using UnityEngine;
 
 using System;
+using System.Diagnostics;
 using System.Collections.Generic;
 using System.Reflection;
 
@@ -34,7 +35,7 @@ namespace FineRoadTool
         }
     }
 
-    public class FineRoadTool : MonoBehaviour
+    public class FineRoadTool : MonoBehaviour, ISimulationManager
     {
         public const string settingsFileName = "FineRoadTool";
 
@@ -52,6 +53,7 @@ namespace FineRoadTool
         private FieldInfo m_elevationDownField;
         private FieldInfo m_buildingElevationField;
         private FieldInfo m_controlPointCountField;
+        private FieldInfo m_upgrading;
         #endregion
 
         private bool m_keyDisabled;
@@ -72,6 +74,10 @@ namespace FineRoadTool
         private int m_slopeErrorCount;
         private bool m_init;
 
+        private int m_fixNodesCount = 0;
+        private ushort m_fixTunnelsCount = 0;
+        private Stopwatch m_stopWatch = new Stopwatch();
+
         private int m_segmentCount;
         private int m_controlPointCount;
         private NetTool.ControlPoint[] m_controlPoints;
@@ -80,6 +86,14 @@ namespace FineRoadTool
         public static readonly SavedInt savedElevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
         public static FineRoadTool instance;
+
+        #region ISimulationManager
+        public virtual void GetData(FastList<ColossalFramework.IO.IDataContainer> data) { }
+        public virtual string GetName() { return gameObject.name; }
+        public virtual ThreadProfiler GetSimulationProfiler() { return new ThreadProfiler(); }
+        public virtual void LateUpdateData(SimulationManager.UpdateMode mode) { }
+        public virtual void UpdateData(SimulationManager.UpdateMode mode) { }
+        #endregion
 
         public Mode mode
         {
@@ -173,8 +187,9 @@ namespace FineRoadTool
             m_elevationDownField = m_netTool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance);
             m_buildingElevationField = m_buildingTool.GetType().GetField("m_elevation", BindingFlags.NonPublic | BindingFlags.Instance);
             m_controlPointCountField = m_netTool.GetType().GetField("m_controlPointCount", BindingFlags.NonPublic | BindingFlags.Instance);
+            m_upgrading = m_netTool.GetType().GetField("m_upgrading", BindingFlags.NonPublic | BindingFlags.Instance);
 
-            if (m_buildErrors == null || m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null || m_buildingElevationField == null || m_controlPointCountField == null)
+            if (m_buildErrors == null || m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null || m_buildingElevationField == null || m_controlPointCountField == null || m_upgrading == null)
             {
                 DebugUtils.Log("NetTool fields not found");
                 m_netTool = null;
@@ -213,7 +228,14 @@ namespace FineRoadTool
             }
 
             // Init dictionary
-            m_init = true;
+            RoadPrefab.Initialize();
+            RoadPrefab.singleMode = true;
+
+            // Fix nodes
+            FixNodes();
+
+            // Registering manager
+            SimulationManager.RegisterSimulationManager(this);
 
             DebugUtils.Log("Initialized");
         }
@@ -268,27 +290,36 @@ namespace FineRoadTool
             RoadPrefab.singleMode = false;
         }
 
-        public void LateUpdate()
+        public virtual void SimulationStep(int subStep)
         {
-            if(m_init)
+            if (!enabled) return;
+
+            // Resume fixes
+            if (m_fixNodesCount != 0 || m_fixTunnelsCount != 0)
             {
-                m_init = false;
-                RoadPrefab.Initialize();
-                RoadPrefab.singleMode = true;
-                FixNodes();
+                RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
+                if (prefab != null) prefab.Restore();
+
+                if (m_fixTunnelsCount != 0) FixTunnels();
+                if (m_fixNodesCount != 0) FixNodes();
+
+                if (prefab != null) prefab.Update();
             }
 
             if (!isActive && !m_bulldozeTool.enabled) return;
 
             try
             {
-                // Check if segment have been created/deleted
-                if (m_segmentCount != NetManager.instance.m_segmentCount)
+                // Check if segment have been created/deleted/updated
+                if (m_segmentCount != NetManager.instance.m_segmentCount || (bool)m_upgrading.GetValue(m_netTool))
                 {
                     m_segmentCount = NetManager.instance.m_segmentCount;
 
                     RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
                     if (prefab != null) prefab.Restore();
+
+                    m_fixTunnelsCount = 0;
+                    m_fixNodesCount = 0;
 
                     FixTunnels();
                     FixNodes();
@@ -318,7 +349,7 @@ namespace FineRoadTool
             }
             catch (Exception e)
             {
-                DebugUtils.Log("LateUpdate failed");
+                DebugUtils.Log("SimulationStep failed");
                 DebugUtils.LogException(e);
             }
         }
@@ -594,17 +625,31 @@ namespace FineRoadTool
             }
         }
 
-        public static void FixNodes()
+        private void FixNodes()
         {
+            m_stopWatch.Reset();
+            m_stopWatch.Start();
+
             NetNode[] nodes = NetManager.instance.m_nodes.m_buffer;
 
-            for (int i = 0; i < NetManager.instance.m_nodes.m_size; i++)
-            {
-                if(nodes[i].m_flags == NetNode.Flags.None || (nodes[i].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.Untouchable) continue;
+            bool singleMode = RoadPrefab.singleMode;
+            RoadPrefab.singleMode = false;
 
+            uint max = NetManager.instance.m_nodes.m_size;
+            for (int i = m_fixNodesCount; i < max; i++)
+            {
+                if (nodes[i].m_flags == NetNode.Flags.None || (nodes[i].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.Untouchable) continue;
+
+                if (m_stopWatch.ElapsedMilliseconds >= 1 && i > m_fixNodesCount + 16)
+                {
+                    m_fixNodesCount = i;
+                    RoadPrefab.singleMode = singleMode;
+                    return;
+                }
+
+                NetInfo info = nodes[i].Info;
                 if ((nodes[i].m_flags & NetNode.Flags.Underground) == NetNode.Flags.Underground)
                 {
-                    NetInfo info = nodes[i].Info;
                     if (info == null || info.m_netAI == null) continue;
 
                     RoadPrefab prefab = RoadPrefab.GetPrefab(info);
@@ -615,116 +660,115 @@ namespace FineRoadTool
                         nodes[i].m_elevation = 0;
                         nodes[i].m_flags = nodes[i].m_flags & ~NetNode.Flags.Underground;
 
-                        try
-                        {
-                            // Updating terrain
-                            TerrainModify.UpdateArea(nodes[i].m_bounds.min.x, nodes[i].m_bounds.min.z, nodes[i].m_bounds.max.x, nodes[i].m_bounds.max.z, true, true, false);
-                        }
-                        catch { }
+                        // Updating terrain
+                        TerrainModify.UpdateArea(nodes[i].m_bounds.min.x, nodes[i].m_bounds.min.z, nodes[i].m_bounds.max.x, nodes[i].m_bounds.max.z, true, true, false);
                     }
                 }
-                /*else if (info != null)
-                {
-                    float pointElevation = nodes[i].m_position.y - NetSegment.SampleTerrainHeight(info, nodes[i].m_position, false, 0f);
-
-                    if (pointElevation < 0) continue;
-                    float diff = nodes[i].m_elevation - pointElevation;
-
-                    if (diff <= -1f || diff >= 1f)
-                    {
-                        nodes[i].m_elevation = (byte)Mathf.RoundToInt(pointElevation);
-                    }
-                }*/
             }
+
+            RoadPrefab.singleMode = singleMode;
+            m_fixNodesCount = 0;
         }
 
-        public static void FixTunnels()
+        private void FixTunnels()
         {
+            m_stopWatch.Reset();
+            m_stopWatch.Start();
+
+            bool singleMode = RoadPrefab.singleMode;
+            RoadPrefab.singleMode = false;
+
             NetNode[] nodes = NetManager.instance.m_nodes.m_buffer;
             NetSegment[] segments = NetManager.instance.m_segments.m_buffer;
 
-            for (ushort i = 0; i < NetManager.instance.m_segments.m_size; i++)
+            uint max = NetManager.instance.m_segments.m_size;
+            for (ushort i = m_fixTunnelsCount; i < max; i++)
             {
-                if (segments[i].m_flags != NetSegment.Flags.None && (segments[i].m_flags & NetSegment.Flags.Untouchable) == NetSegment.Flags.None)
+                if (segments[i].m_flags == NetSegment.Flags.None || (segments[i].m_flags & NetSegment.Flags.Untouchable) == NetSegment.Flags.Untouchable) continue;
+
+                if (m_stopWatch.ElapsedMilliseconds >= 1 && i > m_fixTunnelsCount + 16)
                 {
-                    NetInfo info = segments[i].Info;
+                    m_fixTunnelsCount = i;
+                    RoadPrefab.singleMode = singleMode;
+                    return;
+                }
 
-                    ushort startNode = segments[i].m_startNode;
-                    ushort endNode = segments[i].m_endNode;
+                NetInfo info = segments[i].Info;
 
-                    RoadPrefab prefab = RoadPrefab.GetPrefab(info);
-                    if (prefab == null) continue;
+                ushort startNode = segments[i].m_startNode;
+                ushort endNode = segments[i].m_endNode;
 
-                    // Is it a tunnel?
-                    if (info == prefab.roadAI.tunnel)
+                RoadPrefab prefab = RoadPrefab.GetPrefab(info);
+                if (prefab == null) continue;
+
+                // Is it a tunnel?
+                if (info == prefab.roadAI.tunnel)
+                {
+                    // Make sure tunnels have underground flag
+                    if ((nodes[startNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
+                        nodes[startNode].m_flags = nodes[startNode].m_flags | NetNode.Flags.Underground;
+
+                    if ((nodes[endNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
+                        nodes[endNode].m_flags = nodes[endNode].m_flags | NetNode.Flags.Underground;
+
+                    // Convert tunnel entrance?
+                    if (IsEndTunnel(ref nodes[startNode]))
                     {
-                        // Make sure tunnels have underground flag
+                        // Oops wrong way! Invert the segment
+                        segments[i].m_startNode = endNode;
+                        segments[i].m_endNode = startNode;
+
+                        Vector3 dir = segments[i].m_startDirection;
+
+                        segments[i].m_startDirection = segments[i].m_endDirection;
+                        segments[i].m_endDirection = dir;
+
+                        segments[i].m_flags = segments[i].m_flags ^ NetSegment.Flags.Invert;
+
+                        segments[i].CalculateSegment(i);
+
+                        // Make it a slope
+                        segments[i].Info = prefab.roadAI.slope;
+                        NetManager.instance.UpdateSegment(i);
+
+                        if ((nodes[startNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
+                            nodes[startNode].m_flags = nodes[startNode].m_flags & ~NetNode.Flags.Underground;
+                    }
+                    else if (IsEndTunnel(ref nodes[endNode]))
+                    {
+                        // Make it a slope
+                        segments[i].Info = prefab.roadAI.slope;
+                        NetManager.instance.UpdateSegment(i);
+
+                        if ((nodes[endNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
+                            nodes[endNode].m_flags = nodes[endNode].m_flags & ~NetNode.Flags.Underground;
+                    }
+                }
+                // Is it a slope?
+                else if (info == prefab.roadAI.slope)
+                {
+                    // Convert to tunnel?
+                    if (!IsEndTunnel(ref nodes[startNode]) && !IsEndTunnel(ref nodes[endNode]))
+                    {
                         if ((nodes[startNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
                             nodes[startNode].m_flags = nodes[startNode].m_flags | NetNode.Flags.Underground;
-
                         if ((nodes[endNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
                             nodes[endNode].m_flags = nodes[endNode].m_flags | NetNode.Flags.Underground;
 
-                        // Convert tunnel entrance?
-                        if (IsEndTunnel(ref nodes[startNode]))
-                        {
-                            // Oops wrong way! Invert the segment
-                            segments[i].m_startNode = endNode;
-                            segments[i].m_endNode = startNode;
+                        // Make it a tunnel
+                        segments[i].Info = prefab.roadAI.tunnel;
+                        segments[i].UpdateBounds(i);
 
-                            Vector3 dir = segments[i].m_startDirection;
+                        // Updating terrain
+                        TerrainModify.UpdateArea(segments[i].m_bounds.min.x, segments[i].m_bounds.min.z, segments[i].m_bounds.max.x, segments[i].m_bounds.max.z, true, true, false);
 
-                            segments[i].m_startDirection = segments[i].m_endDirection;
-                            segments[i].m_endDirection = dir;
-
-                            segments[i].m_flags = segments[i].m_flags ^ NetSegment.Flags.Invert;
-
-                            segments[i].CalculateSegment(i);
-
-                            // Make it a slope
-                            segments[i].Info = prefab.roadAI.slope;
-                            NetManager.instance.UpdateSegment(i);
-
-                            if ((nodes[startNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
-                                nodes[startNode].m_flags = nodes[startNode].m_flags & ~NetNode.Flags.Underground;
-                        }
-                        else if (IsEndTunnel(ref nodes[endNode]))
-                        {
-                            // Make it a slope
-                            segments[i].Info = prefab.roadAI.slope;
-                            NetManager.instance.UpdateSegment(i);
-
-                            if ((nodes[endNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
-                                nodes[endNode].m_flags = nodes[endNode].m_flags & ~NetNode.Flags.Underground;
-                        }
+                        NetManager.instance.UpdateSegment(i);
                     }
-                    // Is it a slope?
-                    else if (info == prefab.roadAI.slope)
-                    {
-                        // Convert to tunnel?
-                        if (!IsEndTunnel(ref nodes[startNode]) && !IsEndTunnel(ref nodes[endNode]))
-                        {
-                            if ((nodes[startNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
-                                nodes[startNode].m_flags = nodes[startNode].m_flags | NetNode.Flags.Underground;
-                            if ((nodes[endNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
-                                nodes[endNode].m_flags = nodes[endNode].m_flags | NetNode.Flags.Underground;
-
-                            // Make it a tunnel
-                            segments[i].Info = prefab.roadAI.tunnel;
-                            segments[i].UpdateBounds(i);
-
-                            try
-                            {
-                                // Updating terrain. This can fail somehow.
-                                TerrainModify.UpdateArea(segments[i].m_bounds.min.x, segments[i].m_bounds.min.z, segments[i].m_bounds.max.x, segments[i].m_bounds.max.z, true, true, false);
-                            }
-                            catch { }
-
-                            NetManager.instance.UpdateSegment(i);
-                        }
-                    } 
                 }
             }
+
+            RoadPrefab.singleMode = singleMode;
+            m_fixTunnelsCount = 0;
         }
 
         private bool FixControlPoint(int point)

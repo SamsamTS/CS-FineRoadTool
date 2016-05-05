@@ -55,6 +55,8 @@ namespace FineRoadTool
         {
             m_roadPrefabs = new Dictionary<NetInfo, RoadPrefab>();
 
+            string prefabsAdded = "";
+
             for (uint i = 0; i < PrefabCollection<NetInfo>.PrefabCount(); i++)
             {
                 NetInfo info = PrefabCollection<NetInfo>.GetPrefab(i);
@@ -62,6 +64,7 @@ namespace FineRoadTool
                 RoadPrefab prefab = new RoadPrefab(info);
                 if (prefab.m_hasElevation && prefab.isValid() && !m_roadPrefabs.ContainsKey(info))
                 {
+                    prefabsAdded += info.name + "\n";
                     m_roadPrefabs.Add(info, prefab);
 
                     if (prefab.m_roadAI.elevated != null && !m_roadPrefabs.ContainsKey(prefab.m_roadAI.elevated))
@@ -74,6 +77,8 @@ namespace FineRoadTool
                         m_roadPrefabs.Add(prefab.m_roadAI.tunnel, prefab);
                 }
             }
+
+            DebugUtils.Log("Registered roads:\n" + prefabsAdded);
         }
 
         public static RoadPrefab GetPrefab(NetInfo info)
