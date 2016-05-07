@@ -14,23 +14,31 @@ namespace FineRoadTool
 {
     public class FineRoadToolLoader : LoadingExtensionBase
     {
-        private GameObject m_gameObject;
-
         public override void OnLevelLoaded(LoadMode mode)
         {
-            if (m_gameObject == null)
+            if (FineRoadTool.instance == null)
             {
-                m_gameObject = new GameObject("FineRoadTool");
-                m_gameObject.AddComponent<FineRoadTool>();
+                // Creating the instance
+                FineRoadTool.instance = new GameObject("FineRoadTool").AddComponent<FineRoadTool>();
+
+                // Don't destroy it
+                GameObject.DontDestroyOnLoad(FineRoadTool.instance);
+
+                // Registering manager
+                SimulationManager.RegisterSimulationManager(FineRoadTool.instance);
+            }
+            else
+            {
+                FineRoadTool.instance.Start();
+                FineRoadTool.instance.enabled = true;
             }
         }
 
         public override void OnLevelUnloading()
         {
-            if (m_gameObject != null)
+            if (FineRoadTool.instance != null)
             {
-                GameObject.Destroy(m_gameObject);
-                m_gameObject = null;
+                FineRoadTool.instance.enabled = false;
             }
         }
     }
@@ -65,14 +73,11 @@ namespace FineRoadTool
         private Mode m_mode;
         private bool m_straightSlope = false;
 
-        private UIToolOptionsButton m_toolOptionButton;
-        private UIButton m_upgradeButtonTemplate;
         private bool m_buttonExists;
         private bool m_activated;
         private bool m_toolEnabled;
         private bool m_bulldozeToolEnabled;
         private int m_slopeErrorCount;
-        private bool m_init;
 
         private int m_fixNodesCount = 0;
         private ushort m_fixTunnelsCount = 0;
@@ -86,6 +91,9 @@ namespace FineRoadTool
         public static readonly SavedInt savedElevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
         public static FineRoadTool instance;
+
+        private static UIToolOptionsButton m_toolOptionButton;
+        private static UIButton m_upgradeButtonTemplate;
 
         #region ISimulationManager
         public virtual void GetData(FastList<ColossalFramework.IO.IDataContainer> data) { }
@@ -151,8 +159,6 @@ namespace FineRoadTool
 
         public void Start()
         {
-            instance = this;
-
             // Getting NetTool
             m_netTool = GameObject.FindObjectOfType<NetTool>();
             if (m_netTool == null)
@@ -234,9 +240,6 @@ namespace FineRoadTool
             // Fix nodes
             FixNodes();
 
-            // Registering manager
-            SimulationManager.RegisterSimulationManager(this);
-
             DebugUtils.Log("Initialized");
         }
 
@@ -261,7 +264,7 @@ namespace FineRoadTool
                         Activate(prefab);
                 }
 
-                // Plopping intesection?
+                // Plopping intersection?
                 if (m_buildingTool.enabled && !RoadPrefab.singleMode)
                 {
                     int elevation = (int)m_buildingElevationField.GetValue(m_buildingTool);
@@ -294,22 +297,22 @@ namespace FineRoadTool
         {
             if (!enabled) return;
 
-            // Resume fixes
-            if (m_fixNodesCount != 0 || m_fixTunnelsCount != 0)
-            {
-                RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
-                if (prefab != null) prefab.Restore();
-
-                if (m_fixTunnelsCount != 0) FixTunnels();
-                if (m_fixNodesCount != 0) FixNodes();
-
-                if (prefab != null) prefab.Update();
-            }
-
-            if (!isActive && !m_bulldozeTool.enabled) return;
-
             try
             {
+                // Resume fixes
+                if (m_fixNodesCount != 0 || m_fixTunnelsCount != 0)
+                {
+                    RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
+                    if (prefab != null) prefab.Restore();
+
+                    if (m_fixTunnelsCount != 0) FixTunnels();
+                    if (m_fixNodesCount != 0) FixNodes();
+
+                    if (prefab != null) prefab.Update();
+                }
+
+                if (!isActive && !m_bulldozeTool.enabled) return;
+
                 // Check if segment have been created/deleted/updated
                 if (m_segmentCount != NetManager.instance.m_segmentCount || (bool)m_upgrading.GetValue(m_netTool))
                 {
