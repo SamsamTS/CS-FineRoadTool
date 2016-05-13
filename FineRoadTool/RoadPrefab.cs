@@ -60,6 +60,7 @@ namespace FineRoadTool
             for (uint i = 0; i < PrefabCollection<NetInfo>.PrefabCount(); i++)
             {
                 NetInfo info = PrefabCollection<NetInfo>.GetPrefab(i);
+                if (info == null) continue;
 
                 RoadPrefab prefab = new RoadPrefab(info);
                 if (prefab.m_hasElevation && prefab.isValid() && !m_roadPrefabs.ContainsKey(info))
