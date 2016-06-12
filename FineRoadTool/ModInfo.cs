@@ -42,6 +42,17 @@ namespace FineRoadTool
                 UIPanel panel = group.self as UIPanel;
 
                 panel.gameObject.AddComponent<OptionsKeymapping>();
+
+                group.AddSpace(10);
+
+                group.AddButton("Reset tool window position", () =>
+                {
+                    UIToolOptionsButton.savedWindowX.Delete();
+                    UIToolOptionsButton.savedWindowY.Delete();
+
+                    if (UIToolOptionsButton.toolOptionsPanel)
+                        UIToolOptionsButton.toolOptionsPanel.absolutePosition = new Vector3(-1000, -1000);
+                });
             }
             catch (Exception e)
             {
@@ -50,6 +61,6 @@ namespace FineRoadTool
             }
         }
 
-        public const string version = "0.9.12";
+        public const string version = "1.0.0";
     }
 }

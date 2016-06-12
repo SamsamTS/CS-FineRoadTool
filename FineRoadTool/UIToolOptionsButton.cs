@@ -8,7 +8,7 @@ using ColossalFramework.UI;
 
 namespace FineRoadTool
 {
-    class UIToolOptionsButton : UICheckBox
+    public class UIToolOptionsButton : UICheckBox
     {
         private UIButton m_button;
         private UIPanel m_toolOptionsPanel;
@@ -26,6 +26,11 @@ namespace FineRoadTool
         private UITextureAtlas m_atlas;
 
         private UIComponent m_parent;
+
+        public static readonly SavedInt savedWindowX = new SavedInt("windowX", FineRoadTool.settingsFileName, -1000, true);
+        public static readonly SavedInt savedWindowY = new SavedInt("windowY", FineRoadTool.settingsFileName, -1000, true);
+
+        public static UIPanel toolOptionsPanel = null;
 
         public override void Start()
         {
@@ -125,11 +130,13 @@ namespace FineRoadTool
                 if (isChecked)
                 {
                     if (m_toolOptionsPanel.absolutePosition.x < 0)
+                    {
                         m_toolOptionsPanel.absolutePosition = new Vector2(absolutePosition.x - (m_toolOptionsPanel.width - m_button.width) / 2, absolutePosition.y - m_toolOptionsPanel.height);
 
-                    m_toolOptionsPanel.absolutePosition = new Vector2(
-                        Mathf.Clamp(m_toolOptionsPanel.absolutePosition.x, 0, Screen.width - m_toolOptionsPanel.width),
-                        Mathf.Clamp(m_toolOptionsPanel.absolutePosition.y, 0, Screen.height - m_toolOptionsPanel.height));
+                        m_toolOptionsPanel.absolutePosition = new Vector2(
+                            Mathf.Clamp(m_toolOptionsPanel.absolutePosition.x, 0, Screen.width - m_toolOptionsPanel.width),
+                            Mathf.Clamp(m_toolOptionsPanel.absolutePosition.y, 0, Screen.height - m_toolOptionsPanel.height));
+                    }
 
                     m_button.normalBgSprite = "OptionBaseFocused";
 
@@ -158,10 +165,27 @@ namespace FineRoadTool
             m_toolOptionsPanel.atlas = ResourceLoader.GetAtlas("Ingame");
             m_toolOptionsPanel.backgroundSprite = "SubcategoriesPanel";
             m_toolOptionsPanel.size = new Vector2(228, 180);
-            m_toolOptionsPanel.absolutePosition = new Vector2(-1000, -1000);
+            m_toolOptionsPanel.absolutePosition = new Vector3(savedWindowX.value, savedWindowY.value);
             m_toolOptionsPanel.clipChildren = true;
 
             m_toolOptionsPanel.isVisible = false;
+
+            DebugUtils.Log("absolutePosition: " + m_toolOptionsPanel.absolutePosition);
+
+            m_toolOptionsPanel.eventPositionChanged += (c, p) =>
+            {
+                if (m_toolOptionsPanel.absolutePosition.x < 0)
+                    m_toolOptionsPanel.absolutePosition = new Vector2(absolutePosition.x - (m_toolOptionsPanel.width - m_button.width) / 2, absolutePosition.y - m_toolOptionsPanel.height);
+
+                m_toolOptionsPanel.absolutePosition = new Vector2(
+                    Mathf.Clamp(m_toolOptionsPanel.absolutePosition.x, 0, Screen.width - m_toolOptionsPanel.width),
+                    Mathf.Clamp(m_toolOptionsPanel.absolutePosition.y, 0, Screen.height - m_toolOptionsPanel.height));
+
+                savedWindowX.value = (int)m_toolOptionsPanel.absolutePosition.x;
+                savedWindowY.value = (int)m_toolOptionsPanel.absolutePosition.y;
+            };
+
+            toolOptionsPanel = m_toolOptionsPanel;
 
             UIDragHandle dragHandle = m_toolOptionsPanel.AddUIComponent<UIDragHandle>();
             dragHandle.size = m_toolOptionsPanel.size;

@@ -21,8 +21,6 @@ namespace FineRoadTool
         private NetInfo m_slope;
         private NetInfo m_tunnel;
         private float m_maxSlope;
-        private bool m_flattenTerrain;
-        private bool m_followTerrain;
 
         private RoadAIWrapper m_roadAI;
         private Mode m_mode;
@@ -36,9 +34,6 @@ namespace FineRoadTool
             m_roadAI = new RoadAIWrapper(prefab.m_netAI);
 
             m_prefab = prefab;
-
-            m_followTerrain = prefab.m_followTerrain;
-            m_flattenTerrain = prefab.m_flattenTerrain;
 
             m_maxSlope = prefab.m_maxSlope;
 
@@ -67,6 +62,12 @@ namespace FineRoadTool
                 {
                     prefabsAdded += info.name + "\n";
                     m_roadPrefabs.Add(info, prefab);
+
+                    if (!info.m_netAI.IsUnderground())
+                    {
+                        info.m_followTerrain = false;
+                        info.m_flattenTerrain = true;
+                    }
 
                     if (prefab.m_roadAI.elevated != null && !m_roadPrefabs.ContainsKey(prefab.m_roadAI.elevated))
                         m_roadPrefabs.Add(prefab.m_roadAI.elevated, prefab);
@@ -128,8 +129,6 @@ namespace FineRoadTool
                 return;
             }
 
-            m_prefab.m_followTerrain = m_followTerrain;
-            m_prefab.m_flattenTerrain = m_flattenTerrain;
             m_prefab.m_maxSlope = m_maxSlope;
 
             if (m_elevated != null) m_elevated.m_maxSlope = m_maxSlope;
@@ -202,20 +201,11 @@ namespace FineRoadTool
 
             switch (m_mode)
             {
-                case Mode.Normal:
-                    if (FineRoadTool.instance.straightSlope && m_prefab.m_netAI.IsOverground())
-                    {
-                        m_prefab.m_followTerrain = false;
-                        m_prefab.m_flattenTerrain = true;
-                    }
-                    break;
                 case Mode.Ground:
                     m_roadAI.elevated = m_prefab;
                     m_roadAI.bridge = null;
                     m_roadAI.slope = null;
                     m_roadAI.tunnel = m_prefab;
-                    m_prefab.m_followTerrain = false;
-                    m_prefab.m_flattenTerrain = true;
                     break;
                 case Mode.Elevated:
                     if (m_elevated != null)
@@ -246,11 +236,6 @@ namespace FineRoadTool
                     m_roadAI.bridge = null;
                     m_roadAI.slope = null;
                     m_roadAI.tunnel = null;
-                    if (m_prefab.m_netAI.IsOverground())
-                    {
-                        m_prefab.m_followTerrain = false;
-                        m_prefab.m_flattenTerrain = true;
-                    }
                     break;
             }
         }
