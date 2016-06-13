@@ -10,6 +10,7 @@ namespace FineRoadTool
         private FieldInfo m_bridge;
         private FieldInfo m_slope;
         private FieldInfo m_tunnel;
+        private FieldInfo m_invisible;
 
         public RoadAIWrapper(NetAI ai)
         {
@@ -21,6 +22,7 @@ namespace FineRoadTool
                 m_bridge = m_ai.GetType().GetField("m_bridgeInfo");
                 m_slope = m_ai.GetType().GetField("m_slopeInfo");
                 m_tunnel = m_ai.GetType().GetField("m_tunnelInfo");
+                m_invisible = m_ai.GetType().GetField("m_invisible");
             }
             catch
             {
@@ -28,6 +30,7 @@ namespace FineRoadTool
                 m_bridge = null;
                 m_slope = null;
                 m_tunnel = null;
+                m_invisible = null;
             }
         }
 
@@ -80,6 +83,13 @@ namespace FineRoadTool
                 if (!hasElevation) return;
                 m_tunnel.SetValue(m_ai, value);
             }
+        }
+
+        public bool IsInvisible()
+        {
+            if (m_invisible != null) return (bool)m_invisible.GetValue(m_ai);
+
+            return false;
         }
     }
 }

@@ -63,7 +63,11 @@ namespace FineRoadTool
                     prefabsAdded += info.name + "\n";
                     m_roadPrefabs.Add(info, prefab);
 
-                    if (!info.m_netAI.IsUnderground())
+                    if (!info.m_netAI.IsUnderground() && !prefab.m_roadAI.IsInvisible() &&
+                        info != prefab.roadAI.elevated &&
+                        info != prefab.roadAI.bridge &&
+                        info != prefab.roadAI.slope &&
+                        info != prefab.roadAI.tunnel)
                     {
                         info.m_followTerrain = false;
                         info.m_flattenTerrain = true;
