@@ -62,6 +62,7 @@ namespace FineRoadTool
         private FieldInfo m_buildingElevationField;
         private FieldInfo m_controlPointCountField;
         private FieldInfo m_upgrading;
+        private FieldInfo m_placementErrors;
         #endregion
 
         private bool m_keyDisabled;
@@ -194,6 +195,7 @@ namespace FineRoadTool
             m_buildingElevationField = m_buildingTool.GetType().GetField("m_elevation", BindingFlags.NonPublic | BindingFlags.Instance);
             m_controlPointCountField = m_netTool.GetType().GetField("m_controlPointCount", BindingFlags.NonPublic | BindingFlags.Instance);
             m_upgrading = m_netTool.GetType().GetField("m_upgrading", BindingFlags.NonPublic | BindingFlags.Instance);
+            m_placementErrors = m_buildingTool.GetType().GetField("m_placementErrors", BindingFlags.NonPublic | BindingFlags.Instance);
 
             if (m_buildErrors == null || m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null || m_buildingElevationField == null || m_controlPointCountField == null || m_upgrading == null)
             {
@@ -299,6 +301,17 @@ namespace FineRoadTool
 
             try
             {
+                // Removes HeightTooHigh error
+                if(m_buildingTool.enabled)
+                {
+                    ToolBase.ToolErrors errors = (ToolBase.ToolErrors)m_placementErrors.GetValue(m_buildingTool);
+                    if ((errors & ToolBase.ToolErrors.HeightTooHigh) == ToolBase.ToolErrors.HeightTooHigh)
+                    {
+                        errors = errors & ~ToolBase.ToolErrors.HeightTooHigh;
+                        m_placementErrors.SetValue(m_buildingTool, errors);
+                    }
+                }
+
                 // Resume fixes
                 if (m_fixNodesCount != 0 || m_fixTunnelsCount != 0)
                 {
