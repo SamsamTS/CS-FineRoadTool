@@ -60,6 +60,7 @@
     <Compile Include="ResourceLoader.cs" />
     <Compile Include="RoadAIWrapper.cs" />
     <Compile Include="RoadPrefab.cs" />
+    <Compile Include="SJA_Support.cs" />
     <Compile Include="UIToolOptionsButton.cs" />
   </ItemGroup>
   <ItemGroup>

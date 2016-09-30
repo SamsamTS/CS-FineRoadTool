@@ -3,6 +3,7 @@ using UnityEngine;
 
 using System;
 using System.Diagnostics;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 
@@ -146,6 +147,11 @@ namespace FineRoadTool
             {
                 if (value != m_straightSlope)
                 {
+                    if (SJA_Support.modExists && value)
+                    {
+                        SJA_Support.anarchyEnabled = false;
+                    }
+
                     m_straightSlope = value;
                     m_mousePosition = Vector2.zero;
 
@@ -160,6 +166,8 @@ namespace FineRoadTool
 
         public void Start()
         {
+            SJA_Support.Init();
+
             // Getting NetTool
             m_netTool = GameObject.FindObjectOfType<NetTool>();
             if (m_netTool == null)
@@ -274,6 +282,11 @@ namespace FineRoadTool
                 }
                 else
                     RoadPrefab.singleMode = !m_netTool.enabled && !m_bulldozeTool.enabled;
+
+                if (m_activated && SJA_Support.modExists && m_straightSlope && SJA_Support.anarchyEnabled)
+                {
+                    straightSlope = false;
+                }
             }
             catch (Exception e)
             {
@@ -302,7 +315,7 @@ namespace FineRoadTool
             try
             {
                 // Removes HeightTooHigh error
-                if(m_buildingTool.enabled)
+                if (m_buildingTool.enabled)
                 {
                     ToolBase.ToolErrors errors = (ToolBase.ToolErrors)m_placementErrors.GetValue(m_buildingTool);
                     if ((errors & ToolBase.ToolErrors.HeightTooHigh) == ToolBase.ToolErrors.HeightTooHigh)
@@ -353,7 +366,7 @@ namespace FineRoadTool
                     {
                         m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_controlPoints[0].m_elevation / m_elevationStep) * m_elevationStep * 256f / 12f);
                         UpdateElevation();
-                        m_toolOptionButton.UpdateInfo();
+                        if (m_toolOptionButton != null) m_toolOptionButton.UpdateInfo();
                     }
                 }
                 // Fix last control point elevation
@@ -551,6 +564,11 @@ namespace FineRoadTool
             m_toolOptionButton.UpdateInfo();
 
             DebugUtils.Log("Activated: " + info.name + " selected");
+
+            if (SJA_Support.modExists && m_straightSlope)
+            {
+                SJA_Support.anarchyEnabled = false;
+            }
         }
 
         private void Deactivate()
@@ -727,6 +745,8 @@ namespace FineRoadTool
                     if ((nodes[endNode].m_flags & NetNode.Flags.Untouchable) == NetNode.Flags.None)
                         nodes[endNode].m_flags = nodes[endNode].m_flags | NetNode.Flags.Underground;
 
+                    if (prefab.roadAI.slope == null) continue;
+
                     // Convert tunnel entrance?
                     if (IsEndTunnel(ref nodes[startNode]))
                     {
@@ -763,6 +783,8 @@ namespace FineRoadTool
                 // Is it a slope?
                 else if (info == prefab.roadAI.slope)
                 {
+                    if (prefab.roadAI.tunnel == null) continue;
+
                     // Convert to tunnel?
                     if (!IsEndTunnel(ref nodes[startNode]) && !IsEndTunnel(ref nodes[endNode]))
                     {
