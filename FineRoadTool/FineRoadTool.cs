@@ -49,7 +49,7 @@ namespace FineRoadTool
         public const string settingsFileName = "FineRoadTool";
 
         private int m_elevation = 0;
-        private int m_elevationStep = 3;
+        private SavedInt m_elevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
         private NetTool m_netTool;
         private BulldozeTool m_bulldozeTool;
@@ -90,7 +90,6 @@ namespace FineRoadTool
         private NetTool.ControlPoint[] m_controlPoints;
         private NetTool.ControlPoint[] m_cachedControlPoints;
 
-        public static readonly SavedInt savedElevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
 
         public static FineRoadTool instance;
 
@@ -125,8 +124,11 @@ namespace FineRoadTool
 
         public int elevationStep
         {
-            get { return m_elevationStep; }
-            set { m_elevationStep = Mathf.Clamp(value, 1, 12); }
+            get { return m_elevationStep.value; }
+            set
+            {
+                m_elevationStep.value = Mathf.Clamp(value, 1, 12);
+            }
         }
 
         public int elevation
@@ -222,9 +224,6 @@ namespace FineRoadTool
             {
                 DebugUtils.Log("Upgrade button template not found");
             }
-
-            // Restoring elevation step
-            m_elevationStep = savedElevationStep;
 
             // Creating UI
             CreateToolOptionsButton();
@@ -364,7 +363,7 @@ namespace FineRoadTool
                 {
                     if (FixControlPoint(0))
                     {
-                        m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_controlPoints[0].m_elevation / m_elevationStep) * m_elevationStep * 256f / 12f);
+                        m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_controlPoints[0].m_elevation / elevationStep) * elevationStep * 256f / 12f);
                         UpdateElevation();
                         if (m_toolOptionButton != null) m_toolOptionButton.UpdateInfo();
                     }
@@ -437,31 +436,29 @@ namespace FineRoadTool
                 // Checking key presses
                 if (OptionsKeymapping.elevationUp.IsPressed(e))
                 {
-                    m_elevation += Mathf.RoundToInt(256f * m_elevationStep / 12f);
+                    m_elevation += Mathf.RoundToInt(256f * elevationStep / 12f);
                     UpdateElevation();
                     m_mousePosition = Vector2.zero;
                 }
                 else if (OptionsKeymapping.elevationDown.IsPressed(e))
                 {
-                    m_elevation -= Mathf.RoundToInt(256f * m_elevationStep / 12f);
+                    m_elevation -= Mathf.RoundToInt(256f * elevationStep / 12f);
                     UpdateElevation();
                     m_mousePosition = Vector2.zero;
                 }
                 else if (OptionsKeymapping.elevationStepUp.IsPressed(e))
                 {
-                    if (m_elevationStep < 12)
+                    if (elevationStep < 12)
                     {
-                        m_elevationStep++;
-                        savedElevationStep.value = m_elevationStep;
+                        elevationStep++;
                         m_toolOptionButton.UpdateInfo();
                     }
                 }
                 else if (OptionsKeymapping.elevationStepDown.IsPressed(e))
                 {
-                    if (m_elevationStep > 1)
+                    if (elevationStep > 1)
                     {
-                        m_elevationStep--;
-                        savedElevationStep.value = m_elevationStep;
+                        elevationStep--;
                         m_toolOptionButton.UpdateInfo();
                     }
                 }
@@ -617,7 +614,7 @@ namespace FineRoadTool
             m_current.m_netAI.GetElevationLimits(out min, out max);
 
             m_elevation = Mathf.Clamp(m_elevation, min * 256, max * 256);
-            if (m_elevationStep < 3) m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_elevation / (256f / 12f)) * (256f / 12f));
+            if (elevationStep < 3) m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_elevation / (256f / 12f)) * (256f / 12f));
 
             if ((int)m_elevationField.GetValue(m_netTool) != m_elevation)
             {
