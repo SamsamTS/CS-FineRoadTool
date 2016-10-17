@@ -31,10 +31,12 @@ namespace FineRoadTool
 
                 if (value)
                 {
+                    DebugUtils.Log("Enabling anarchy");
                     m_enableAnarchy.Invoke(m_instance, null);
                 }
                 else
                 {
+                    DebugUtils.Log("Disabling anarchy");
                     m_disableAnarchy.Invoke(m_instance, null);
                 }
 

@@ -54,6 +54,7 @@ namespace FineRoadTool
         private NetTool m_netTool;
         private BulldozeTool m_bulldozeTool;
         private BuildingTool m_buildingTool;
+        private bool inEditor;
 
         #region Reflection to private field/methods
         private FieldInfo m_buildErrors;
@@ -156,12 +157,19 @@ namespace FineRoadTool
 
                     m_straightSlope = value;
                     m_mousePosition = Vector2.zero;
+                    m_slopeErrorCount = 0;
+
+                    m_toolOptionButton.UpdateInfo();
+
+                    if (value)
+                        DebugUtils.Log("Straight Slope enabled");
+                    else
+                        DebugUtils.Log("Straight Slope disabled");
 
                     RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
                     if (prefab == null) return;
 
                     prefab.Update();
-                    m_toolOptionButton.UpdateInfo();
                 }
             }
         }
@@ -244,7 +252,9 @@ namespace FineRoadTool
 
             // Init dictionary
             RoadPrefab.Initialize();
-            RoadPrefab.singleMode = true;
+
+            inEditor = (ToolManager.instance.m_properties.m_mode & ItemClass.Availability.AssetEditor) != ItemClass.Availability.None;
+            RoadPrefab.singleMode = inEditor;
 
             // Fix nodes
             FixNodes();
@@ -274,13 +284,18 @@ namespace FineRoadTool
                 }
 
                 // Plopping intersection?
-                if (m_buildingTool.enabled && !RoadPrefab.singleMode)
+                if (m_buildingTool.enabled)
                 {
-                    int elevation = (int)m_buildingElevationField.GetValue(m_buildingTool);
-                    RoadPrefab.singleMode = (elevation == 0);
+                    if (!RoadPrefab.singleMode)
+                    {
+                        int elevation = (int)m_buildingElevationField.GetValue(m_buildingTool);
+                        RoadPrefab.singleMode = (elevation == 0);
+                    }
                 }
                 else
-                    RoadPrefab.singleMode = !m_netTool.enabled && !m_bulldozeTool.enabled;
+                {
+                    RoadPrefab.singleMode = inEditor && !m_netTool.enabled && !m_bulldozeTool.enabled;
+                }
 
                 if (m_activated && SJA_Support.modExists && m_straightSlope && SJA_Support.anarchyEnabled)
                 {
