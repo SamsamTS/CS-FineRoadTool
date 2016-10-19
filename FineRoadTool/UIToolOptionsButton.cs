@@ -53,10 +53,12 @@ namespace FineRoadTool
                 else
                     relativePosition = new Vector2(36, 0);
 
-                if (m_toolOptionsPanel != null)
-                    m_toolOptionsPanel.isVisible = isVisible && isChecked;
-
                 UpdateInfo();
+            }
+
+            if (m_toolOptionsPanel != null)
+            {
+                m_toolOptionsPanel.isVisible = FineRoadTool.instance.isActive && isChecked;
             }
         }
 
@@ -126,7 +128,6 @@ namespace FineRoadTool
 
             eventCheckChanged += (c, isChecked) =>
             {
-                m_toolOptionsPanel.isVisible = isVisible && isChecked;
                 if (isChecked)
                 {
                     if (m_toolOptionsPanel.absolutePosition.x < 0)
@@ -148,12 +149,6 @@ namespace FineRoadTool
                 }
                 UpdateInfo();
             };
-        }
-
-        protected override void OnVisibilityChanged()
-        {
-            if (m_toolOptionsPanel != null)
-                m_toolOptionsPanel.isVisible = isVisible && isChecked;
         }
 
         protected override void OnClick(UIMouseEventParameter p) { }
@@ -274,7 +269,6 @@ namespace FineRoadTool
             m_bridgeModeButton = CreateModeCheckBox(modePanel, "BridgeMode", "Bridge: Forces the use of bridge pieces if available");
             m_tunnelModeButton = CreateModeCheckBox(modePanel, "TunnelMode", "Tunnel: Forces the use of tunnel pieces if available");
 
-            m_normalModeButton.isChecked = true;
             modePanel.autoLayout = true;
 
             // Straight Slope
@@ -289,6 +283,8 @@ namespace FineRoadTool
             {
                 FineRoadTool.instance.straightSlope = state;
             };
+
+            m_normalModeButton.isChecked = true;
         }
 
         private UICheckBox CreateCheckBox(UIComponent parent)

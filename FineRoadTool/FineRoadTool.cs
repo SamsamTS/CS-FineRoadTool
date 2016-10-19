@@ -54,7 +54,6 @@ namespace FineRoadTool
         private NetTool m_netTool;
         private BulldozeTool m_bulldozeTool;
         private BuildingTool m_buildingTool;
-        private bool inEditor;
 
         #region Reflection to private field/methods
         private FieldInfo m_buildErrors;
@@ -79,7 +78,8 @@ namespace FineRoadTool
         private bool m_buttonExists;
         private bool m_activated;
         private bool m_toolEnabled;
-        private bool m_bulldozeToolEnabled;
+        private bool m_buttonInOptionsBar;
+        private bool m_inEditor;
         private int m_slopeErrorCount;
 
         private int m_fixNodesCount = 0;
@@ -253,8 +253,8 @@ namespace FineRoadTool
             // Init dictionary
             RoadPrefab.Initialize();
 
-            inEditor = (ToolManager.instance.m_properties.m_mode & ItemClass.Availability.AssetEditor) != ItemClass.Availability.None;
-            RoadPrefab.singleMode = inEditor;
+            m_inEditor = (ToolManager.instance.m_properties.m_mode & ItemClass.Availability.AssetEditor) != ItemClass.Availability.None;
+            RoadPrefab.singleMode = m_inEditor;
 
             // Fix nodes
             FixNodes();
@@ -272,15 +272,19 @@ namespace FineRoadTool
                 NetInfo prefab = m_netTool.enabled || m_bulldozeTool.enabled ? m_netTool.m_prefab : null;
 
                 // Has the prefab/tool changed?
-                if (prefab != m_current || m_toolEnabled != m_netTool.enabled || m_bulldozeToolEnabled != m_bulldozeTool.enabled)
+                if (prefab != m_current || m_toolEnabled != m_netTool.enabled)
                 {
                     m_toolEnabled = m_netTool.enabled;
-                    m_bulldozeToolEnabled = m_bulldozeTool.enabled;
 
-                    if (prefab == null && !m_bulldozeTool.enabled)
+                    if (prefab == null)
                         Deactivate();
                     else
                         Activate(prefab);
+
+                    if (m_toolOptionButton != null && m_buttonInOptionsBar)
+                    {
+                        m_toolOptionButton.isVisible = m_netTool.enabled;
+                    }
                 }
 
                 // Plopping intersection?
@@ -294,7 +298,7 @@ namespace FineRoadTool
                 }
                 else
                 {
-                    RoadPrefab.singleMode = inEditor && !m_netTool.enabled && !m_bulldozeTool.enabled;
+                    RoadPrefab.singleMode = m_inEditor && !m_netTool.enabled && !m_bulldozeTool.enabled;
                 }
 
                 if (m_activated && SJA_Support.modExists && m_straightSlope && SJA_Support.anarchyEnabled)
@@ -546,6 +550,8 @@ namespace FineRoadTool
 
         private void Activate(NetInfo info)
         {
+            if (info == null) return;
+
             RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
             if (prefab != null) prefab.Restore();
 
@@ -592,9 +598,6 @@ namespace FineRoadTool
             m_current = null;
 
             RestoreDefaultKeys();
-
-            if (m_toolOptionButton != null)
-                m_toolOptionButton.isVisible = false;
 
             m_activated = false;
 
@@ -925,6 +928,7 @@ namespace FineRoadTool
                     if (button != null)
                     {
                         m_toolOptionButton.transform.SetParent(button.transform);
+                        m_buttonInOptionsBar = false;
                         button.tooltip = null;
                         m_buttonExists = true;
                     }
@@ -957,6 +961,7 @@ namespace FineRoadTool
                     return;
                 }
                 m_toolOptionButton.transform.SetParent(optionBar.transform);
+                m_buttonInOptionsBar = true;
             }
         }
     }
