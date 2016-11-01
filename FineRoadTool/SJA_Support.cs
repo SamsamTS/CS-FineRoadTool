@@ -14,11 +14,15 @@ namespace FineRoadTool
         private static MethodInfo m_disableAnarchy;
         private static MethodInfo m_updateUI;
 
+        private static Type m_SJA_Behaviour = Type.GetType("SharpJunctionAngles.SharpJunctionAngleBehaviour, SharpJunctionAngles");
+
+        private static int m_tries;
+
         public static bool anarchyEnabled
         {
             get
             {
-                if (modExists)
+                if (modExists && InstanceFound())
                 {
                     return (bool)m_anarchyEnabled.GetValue(m_instance);
                 }
@@ -27,7 +31,7 @@ namespace FineRoadTool
 
             set
             {
-                if (!modExists || anarchyEnabled == value) return;
+                if (!modExists || !InstanceFound() || anarchyEnabled == value) return;
 
                 if (value)
                 {
@@ -48,7 +52,7 @@ namespace FineRoadTool
         {
             get
             {
-                return m_instance != null;
+                return m_SJA_Behaviour != null;
             }
         }
 
@@ -56,28 +60,48 @@ namespace FineRoadTool
         {
             try
             {
-                Type SJA_Behaviour = Type.GetType("SharpJunctionAngles.SharpJunctionAngleBehaviour, SharpJunctionAngles");
+                m_tries = 0;
+                m_instance = null;
+                m_SJA_Behaviour = Type.GetType("SharpJunctionAngles.SharpJunctionAngleBehaviour, SharpJunctionAngles");
 
-                if (SJA_Behaviour != null)
+                if (m_SJA_Behaviour != null)
                 {
-                    m_instance = GameObject.FindObjectOfType(SJA_Behaviour);
+                    m_anarchyEnabled = m_SJA_Behaviour.GetField("anarchyEnabled", BindingFlags.Instance | BindingFlags.NonPublic);
 
-                    if (m_instance != null)
-                    {
-                        DebugUtils.Log("SharpJunctionAngle found.");
-
-                        m_anarchyEnabled = m_instance.GetType().GetField("anarchyEnabled", BindingFlags.Instance | BindingFlags.NonPublic);
-
-                        m_enableAnarchy = m_instance.GetType().GetMethod("enableAnarchy");
-                        m_disableAnarchy = m_instance.GetType().GetMethod("disableAnarchy");
-                        m_updateUI = m_instance.GetType().GetMethod("updateUI", BindingFlags.Instance | BindingFlags.NonPublic);
-                    }
+                    m_enableAnarchy = m_SJA_Behaviour.GetMethod("enableAnarchy");
+                    m_disableAnarchy = m_SJA_Behaviour.GetMethod("disableAnarchy");
+                    m_updateUI = m_SJA_Behaviour.GetMethod("updateUI", BindingFlags.Instance | BindingFlags.NonPublic);
                 }
             }
             catch (Exception e)
             {
                 m_instance = null;
                 DebugUtils.LogException(e);
+            }
+        }
+
+        private static bool InstanceFound()
+        {
+            try
+            {
+                if (m_instance == null && m_tries++ < 10)
+                {
+                    m_instance = GameObject.Find("SharpJunctionAngles").GetComponent(m_SJA_Behaviour);
+
+                    if (m_tries >= 10)
+                    {
+                        m_SJA_Behaviour = null;
+                    }
+                }
+
+                return m_instance != null;
+            }
+            catch (Exception e)
+            {
+                m_SJA_Behaviour = null;
+                m_instance = null;
+                DebugUtils.LogException(e);
+                return false;
             }
         }
     }
