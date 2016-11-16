@@ -53,6 +53,7 @@
     <Compile Include="ModInfo.cs" />
     <Compile Include="DebugUtils.cs" />
     <Compile Include="FineRoadTool.cs" />
+    <Compile Include="NetSkins_Support.cs" />
     <Compile Include="OptionsKeymapping.cs">
       <SubType>Code</SubType>
     </Compile>

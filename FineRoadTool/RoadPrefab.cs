@@ -204,6 +204,8 @@ namespace FineRoadTool
 
             Restore();
 
+            NetSkins_Support.ForceUpdate();
+
             switch (m_mode)
             {
                 case Mode.Ground:

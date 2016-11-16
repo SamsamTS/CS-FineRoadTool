@@ -60,14 +60,17 @@ namespace FineRoadTool
         {
             if (FineRoadTool.instance == null) return;
 
-            if (parent.name == "OptionsBar")
+            if (parent != null)
             {
-                relativePosition = new Vector2(36, 0);
-            }
-            else
-            {
-                relativePosition = Vector2.zero;
-                parent.BringToFront();
+                if (parent.name == "OptionsBar")
+                {
+                    relativePosition = new Vector2(36, 0);
+                }
+                else
+                {
+                    relativePosition = Vector2.zero;
+                    parent.BringToFront();
+                }
             }
 
             m_button.text = m_elevationStepLabel.text = FineRoadTool.instance.elevationStep + "m\n";
@@ -137,15 +140,18 @@ namespace FineRoadTool
                     if (m_toolOptionsPanel.absolutePosition.x < 0)
                     {
                         m_toolOptionsPanel.absolutePosition = new Vector2(absolutePosition.x - (m_toolOptionsPanel.width - m_button.width) / 2, absolutePosition.y - m_toolOptionsPanel.height);
-
-                        m_toolOptionsPanel.absolutePosition = new Vector2(
-                            Mathf.Clamp(m_toolOptionsPanel.absolutePosition.x, 0, Screen.width - m_toolOptionsPanel.width),
-                            Mathf.Clamp(m_toolOptionsPanel.absolutePosition.y, 0, Screen.height - m_toolOptionsPanel.height));
                     }
+
+                    Vector2 resolution = GetUIView().GetScreenResolution();
+
+                    m_toolOptionsPanel.absolutePosition = new Vector2(
+                        Mathf.Clamp(m_toolOptionsPanel.absolutePosition.x, 0, resolution.x - m_toolOptionsPanel.width),
+                        Mathf.Clamp(m_toolOptionsPanel.absolutePosition.y, 0, resolution.y - m_toolOptionsPanel.height));
 
                     m_button.normalBgSprite = "OptionBaseFocused";
 
                     m_toolOptionsPanel.BringToFront();
+                    UpdateInfo();
                 }
                 else
                 {
@@ -176,9 +182,11 @@ namespace FineRoadTool
                 if (m_toolOptionsPanel.absolutePosition.x < 0)
                     m_toolOptionsPanel.absolutePosition = new Vector2(absolutePosition.x - (m_toolOptionsPanel.width - m_button.width) / 2, absolutePosition.y - m_toolOptionsPanel.height);
 
+                Vector2 resolution = GetUIView().GetScreenResolution();
+
                 m_toolOptionsPanel.absolutePosition = new Vector2(
-                    Mathf.Clamp(m_toolOptionsPanel.absolutePosition.x, 0, Screen.width - m_toolOptionsPanel.width),
-                    Mathf.Clamp(m_toolOptionsPanel.absolutePosition.y, 0, Screen.height - m_toolOptionsPanel.height));
+                    Mathf.Clamp(m_toolOptionsPanel.absolutePosition.x, 0, resolution.x - m_toolOptionsPanel.width),
+                    Mathf.Clamp(m_toolOptionsPanel.absolutePosition.y, 0, resolution.y - m_toolOptionsPanel.height));
 
                 savedWindowX.value = (int)m_toolOptionsPanel.absolutePosition.x;
                 savedWindowY.value = (int)m_toolOptionsPanel.absolutePosition.y;

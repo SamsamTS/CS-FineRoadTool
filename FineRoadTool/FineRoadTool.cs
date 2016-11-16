@@ -177,6 +177,7 @@ namespace FineRoadTool
         public void Start()
         {
             SJA_Support.Init();
+            NetSkins_Support.Init();
 
             // Getting NetTool
             m_netTool = GameObject.FindObjectOfType<NetTool>();
