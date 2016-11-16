@@ -42,18 +42,12 @@ namespace FineRoadTool
 
         public override void Update()
         {
-            if (parent != m_parent)
+            if (parent != m_parent && parent != null)
             {
                 m_parent = parent;
-                if (parent is UIMultiStateButton)
-                {
-                    relativePosition = Vector2.zero;
-                    parent.BringToFront();
-                }
-                else
-                    relativePosition = new Vector2(36, 0);
 
                 UpdateInfo();
+                DebugUtils.Log("Tool button parent changed: " + parent.name);
             }
 
             if (m_toolOptionsPanel != null)
@@ -65,6 +59,16 @@ namespace FineRoadTool
         public void UpdateInfo()
         {
             if (FineRoadTool.instance == null) return;
+
+            if (parent.name == "OptionsBar")
+            {
+                relativePosition = new Vector2(36, 0);
+            }
+            else
+            {
+                relativePosition = Vector2.zero;
+                parent.BringToFront();
+            }
 
             m_button.text = m_elevationStepLabel.text = FineRoadTool.instance.elevationStep + "m\n";
             m_elevationStepSlider.value = FineRoadTool.instance.elevationStep;

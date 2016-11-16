@@ -281,9 +281,9 @@ namespace FineRoadTool
                     else
                         Activate(prefab);
 
-                    if (m_toolOptionButton != null && m_buttonInOptionsBar)
+                    if (m_toolOptionButton != null)
                     {
-                        m_toolOptionButton.isVisible = m_netTool.enabled;
+                        m_toolOptionButton.isVisible = m_activated || !m_buttonInOptionsBar;
                     }
                 }
 
@@ -924,7 +924,7 @@ namespace FineRoadTool
                 if (panel.component.isVisible)
                 {
                     // Put the main button in ElevationStep
-                    UIMultiStateButton button = panel.component.Find<UIMultiStateButton>("ElevationStep");
+                    UIComponent button = panel.component.Find<UIComponent>("ElevationStep");
                     if (button != null)
                     {
                         m_toolOptionButton.transform.SetParent(button.transform);
