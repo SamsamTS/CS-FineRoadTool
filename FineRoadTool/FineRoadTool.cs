@@ -105,6 +105,7 @@ namespace FineRoadTool
         public virtual ThreadProfiler GetSimulationProfiler() { return new ThreadProfiler(); }
         public virtual void LateUpdateData(SimulationManager.UpdateMode mode) { }
         public virtual void UpdateData(SimulationManager.UpdateMode mode) { }
+        public virtual void EarlyUpdateData() { }
         #endregion
 
         public Mode mode
