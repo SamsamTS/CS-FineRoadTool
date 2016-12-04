@@ -35,12 +35,10 @@ namespace FineRoadTool
 
                 if (value)
                 {
-                    DebugUtils.Log("Enabling anarchy");
                     m_enableAnarchy.Invoke(m_instance, null);
                 }
                 else
                 {
-                    DebugUtils.Log("Disabling anarchy");
                     m_disableAnarchy.Invoke(m_instance, null);
                 }
 
@@ -96,11 +94,10 @@ namespace FineRoadTool
 
                 return m_instance != null;
             }
-            catch (Exception e)
+            catch
             {
                 m_SJA_Behaviour = null;
                 m_instance = null;
-                DebugUtils.LogException(e);
                 return false;
             }
         }

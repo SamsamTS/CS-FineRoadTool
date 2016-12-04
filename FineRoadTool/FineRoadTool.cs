@@ -58,18 +58,17 @@ namespace FineRoadTool
         private BuildingTool m_buildingTool;
 
         #region Reflection to private field/methods
-        private FieldInfo m_buildErrors;
         private FieldInfo m_elevationField;
         private FieldInfo m_elevationUpField;
         private FieldInfo m_elevationDownField;
         private FieldInfo m_buildingElevationField;
         private FieldInfo m_controlPointCountField;
-        private FieldInfo m_upgrading;
-        private FieldInfo m_placementErrors;
+        private FieldInfo m_upgradingField;
+        private FieldInfo m_placementErrorsField;
         #endregion
 
         private bool m_keyDisabled;
-        private Vector2 m_mousePosition;
+        private Vector3 m_lastNodePosition;
 
         private NetInfo m_current;
         private InfoManager.InfoMode m_infoMode = (InfoManager.InfoMode)(-1);
@@ -82,7 +81,6 @@ namespace FineRoadTool
         private bool m_toolEnabled;
         private bool m_buttonInOptionsBar;
         private bool m_inEditor;
-        private int m_slopeErrorCount;
 
         private int m_fixNodesCount = 0;
         private ushort m_fixTunnelsCount = 0;
@@ -92,7 +90,6 @@ namespace FineRoadTool
         private int m_controlPointCount;
         private NetTool.ControlPoint[] m_controlPoints;
         private NetTool.ControlPoint[] m_cachedControlPoints;
-
 
         public static FineRoadTool instance;
 
@@ -159,8 +156,7 @@ namespace FineRoadTool
                     }
 
                     m_straightSlope = value;
-                    m_mousePosition = Vector2.zero;
-                    m_slopeErrorCount = 0;
+                    m_lastNodePosition = Vector3.zero;
 
                     m_toolOptionButton.UpdateInfo();
 
@@ -210,16 +206,15 @@ namespace FineRoadTool
             }
 
             // Getting NetTool private fields
-            m_buildErrors = m_netTool.GetType().GetField("m_buildErrors", BindingFlags.NonPublic | BindingFlags.Instance);
             m_elevationField = m_netTool.GetType().GetField("m_elevation", BindingFlags.NonPublic | BindingFlags.Instance);
             m_elevationUpField = m_netTool.GetType().GetField("m_buildElevationUp", BindingFlags.NonPublic | BindingFlags.Instance);
             m_elevationDownField = m_netTool.GetType().GetField("m_buildElevationDown", BindingFlags.NonPublic | BindingFlags.Instance);
             m_buildingElevationField = m_buildingTool.GetType().GetField("m_elevation", BindingFlags.NonPublic | BindingFlags.Instance);
             m_controlPointCountField = m_netTool.GetType().GetField("m_controlPointCount", BindingFlags.NonPublic | BindingFlags.Instance);
-            m_upgrading = m_netTool.GetType().GetField("m_upgrading", BindingFlags.NonPublic | BindingFlags.Instance);
-            m_placementErrors = m_buildingTool.GetType().GetField("m_placementErrors", BindingFlags.NonPublic | BindingFlags.Instance);
+            m_upgradingField = m_netTool.GetType().GetField("m_upgrading", BindingFlags.NonPublic | BindingFlags.Instance);
+            m_placementErrorsField = m_buildingTool.GetType().GetField("m_placementErrors", BindingFlags.NonPublic | BindingFlags.Instance);
 
-            if (m_buildErrors == null || m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null || m_buildingElevationField == null || m_controlPointCountField == null || m_upgrading == null)
+            if (m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null || m_buildingElevationField == null || m_controlPointCountField == null || m_upgradingField == null || m_placementErrorsField == null)
             {
                 DebugUtils.Log("NetTool fields not found");
                 m_netTool = null;
@@ -342,11 +337,11 @@ namespace FineRoadTool
                 // Removes HeightTooHigh error
                 if (m_buildingTool.enabled)
                 {
-                    ToolBase.ToolErrors errors = (ToolBase.ToolErrors)m_placementErrors.GetValue(m_buildingTool);
+                    ToolBase.ToolErrors errors = (ToolBase.ToolErrors)m_placementErrorsField.GetValue(m_buildingTool);
                     if ((errors & ToolBase.ToolErrors.HeightTooHigh) == ToolBase.ToolErrors.HeightTooHigh)
                     {
                         errors = errors & ~ToolBase.ToolErrors.HeightTooHigh;
-                        m_placementErrors.SetValue(m_buildingTool, errors);
+                        m_placementErrorsField.SetValue(m_buildingTool, errors);
                     }
                 }
 
@@ -365,7 +360,7 @@ namespace FineRoadTool
                 if (!isActive && !m_bulldozeTool.enabled) return;
 
                 // Check if segment have been created/deleted/updated
-                if (m_segmentCount != NetManager.instance.m_segmentCount || (bool)m_upgrading.GetValue(m_netTool))
+                if (m_segmentCount != NetManager.instance.m_segmentCount || (bool)m_upgradingField.GetValue(m_netTool))
                 {
                     m_segmentCount = NetManager.instance.m_segmentCount;
 
@@ -464,13 +459,11 @@ namespace FineRoadTool
                 {
                     m_elevation += Mathf.RoundToInt(256f * elevationStep / 12f);
                     UpdateElevation();
-                    m_mousePosition = Vector2.zero;
                 }
                 else if (OptionsKeymapping.elevationDown.IsPressed(e))
                 {
                     m_elevation -= Mathf.RoundToInt(256f * elevationStep / 12f);
                     UpdateElevation();
-                    m_mousePosition = Vector2.zero;
                 }
                 else if (OptionsKeymapping.elevationStepUp.IsPressed(e))
                 {
@@ -508,7 +501,6 @@ namespace FineRoadTool
                 {
                     m_elevation = 0;
                     UpdateElevation();
-                    m_mousePosition = Vector2.zero;
                     m_toolOptionButton.UpdateInfo();
                 }
                 else if (OptionsKeymapping.toggleStraightSlope.IsPressed(e))
@@ -517,23 +509,8 @@ namespace FineRoadTool
                     m_toolOptionButton.UpdateInfo();
                 }
 
-                if (m_straightSlope)
-                {
-                    bool slopeTooSteep = ((ToolBase.ToolErrors)m_buildErrors.GetValue(m_netTool) & ToolBase.ToolErrors.SlopeTooSteep) != ToolBase.ToolErrors.None;
-
-                    if (e.mousePosition != m_mousePosition)
-                    {
-                        m_mousePosition = e.mousePosition;
-                        m_slopeErrorCount = 0;
-                        UpdateMaxSlope();
-                    }
-                    else if (slopeTooSteep)
-                    {
-                        if (m_slopeErrorCount < 5) m_slopeErrorCount++;
-                        UpdateMaxSlope();
-                    }
-                    else m_slopeErrorCount = 0;
-                }
+                // Update Max Slope
+                if (m_straightSlope) UpdateMaxSlope();
 
                 if (m_mode == Mode.Tunnel && InfoManager.instance.CurrentMode != InfoManager.InfoMode.Traffic)
                 {
@@ -650,31 +627,29 @@ namespace FineRoadTool
 
         private void UpdateMaxSlope()
         {
-            if (m_current == null) return;
-
-            RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
-            if (prefab == null) return;
-
-            if (NetTool.m_nodePositionsMain.m_size > 1)
+            if (m_current != null &&
+                    NetTool.m_nodePositionsMain.m_size > 1 &&
+                    NetTool.m_nodePositionsMain.m_buffer[NetTool.m_nodePositionsMain.m_size - 1].m_position != m_lastNodePosition)
             {
+                m_lastNodePosition = NetTool.m_nodePositionsMain.m_buffer[NetTool.m_nodePositionsMain.m_size - 1].m_position;
+
+                RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
+                if (prefab == null) return;
+
                 float slope = prefab.defaultSlope;
+                float length = 0;
 
-                if (m_slopeErrorCount < 5)
+                for (int i = 0; i < NetTool.m_nodePositionsMain.m_size - 1; i++)
                 {
-                    float length = 0;
+                    length += VectorUtils.LengthXZ(NetTool.m_nodePositionsMain.m_buffer[i].m_position - NetTool.m_nodePositionsMain.m_buffer[i + 1].m_position);
+                }
 
-                    for (int i = 0; i < NetTool.m_nodePositionsMain.m_size - 1; i++)
-                    {
-                        length += VectorUtils.LengthXZ(NetTool.m_nodePositionsMain.m_buffer[i].m_position - NetTool.m_nodePositionsMain.m_buffer[i + 1].m_position);
-                    }
+                if (length != 0)
+                {
+                    Vector3 a = NetTool.m_nodePositionsMain.m_buffer[0].m_position;
+                    Vector3 b = NetTool.m_nodePositionsMain.m_buffer[NetTool.m_nodePositionsMain.m_size - 1].m_position;
 
-                    if (length != 0)
-                    {
-                        Vector3 a = NetTool.m_nodePositionsMain.m_buffer[0].m_position;
-                        Vector3 b = NetTool.m_nodePositionsMain.m_buffer[NetTool.m_nodePositionsMain.m_size - 1].m_position;
-
-                        slope = Mathf.Clamp(Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / (length * length)) + 0.000001f, 0, prefab.defaultSlope);
-                    }
+                    slope = Mathf.Sqrt((a.y - b.y) * (a.y - b.y) / (length * length)) + 0.000001f;
                 }
 
                 prefab.SetMaxSlope(slope);
