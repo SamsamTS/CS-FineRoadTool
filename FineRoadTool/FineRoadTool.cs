@@ -68,7 +68,6 @@ namespace FineRoadTool
         #endregion
 
         private bool m_keyDisabled;
-        private Vector3 m_lastNodePosition;
 
         private NetInfo m_current;
         private InfoManager.InfoMode m_infoMode = (InfoManager.InfoMode)(-1);
@@ -156,7 +155,6 @@ namespace FineRoadTool
                     }
 
                     m_straightSlope = value;
-                    m_lastNodePosition = Vector3.zero;
 
                     m_toolOptionButton.UpdateInfo();
 
@@ -627,12 +625,8 @@ namespace FineRoadTool
 
         private void UpdateMaxSlope()
         {
-            if (m_current != null &&
-                    NetTool.m_nodePositionsMain.m_size > 1 &&
-                    NetTool.m_nodePositionsMain.m_buffer[NetTool.m_nodePositionsMain.m_size - 1].m_position != m_lastNodePosition)
+            if (m_current != null && NetTool.m_nodePositionsMain.m_size > 1)
             {
-                m_lastNodePosition = NetTool.m_nodePositionsMain.m_buffer[NetTool.m_nodePositionsMain.m_size - 1].m_position;
-
                 RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
                 if (prefab == null) return;
 
@@ -798,6 +792,23 @@ namespace FineRoadTool
                         TerrainModify.UpdateArea(segments[i].m_bounds.min.x, segments[i].m_bounds.min.z, segments[i].m_bounds.max.x, segments[i].m_bounds.max.z, true, true, false);
 
                         NetManager.instance.UpdateSegment(i);
+                    }
+
+                    // Is tunnel wrong way?
+                    if (IsEndTunnel(ref nodes[startNode]))
+                    {
+                        // Oops wrong way! Invert the segment
+                        segments[i].m_startNode = endNode;
+                        segments[i].m_endNode = startNode;
+
+                        Vector3 dir = segments[i].m_startDirection;
+
+                        segments[i].m_startDirection = segments[i].m_endDirection;
+                        segments[i].m_endDirection = dir;
+
+                        segments[i].m_flags = segments[i].m_flags ^ NetSegment.Flags.Invert;
+
+                        segments[i].CalculateSegment(i);
                     }
                 }
             }

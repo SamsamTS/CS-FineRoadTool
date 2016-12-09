@@ -20,10 +20,19 @@ namespace FineRoadTool
 
         public static void ForceUpdate()
         {
-            if (modExists && InstanceFound())
+            try
             {
-                m_selectedPrefab.SetValue(m_instance, null);
-                m_update.Invoke(m_instance, null);
+                if (modExists && InstanceFound())
+                {
+                    m_selectedPrefab.SetValue(m_instance, null);
+                    m_update.Invoke(m_instance, null);
+                }
+            }
+            catch (Exception e)
+            {
+                m_UINetworkSkinsPanel = null;
+                m_instance = null;
+                DebugUtils.LogException(e);
             }
         }
 
@@ -81,7 +90,7 @@ namespace FineRoadTool
                     }
                 }
 
-                return m_instance != null;
+                return m_instance != null && ((UIComponent)m_instance).enabled;
             }
             catch (Exception e)
             {

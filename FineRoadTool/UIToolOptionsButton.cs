@@ -52,7 +52,7 @@ namespace FineRoadTool
 
             if (m_toolOptionsPanel != null)
             {
-                m_toolOptionsPanel.isVisible = FineRoadTool.instance.isActive && isChecked;
+                m_toolOptionsPanel.isVisible = isVisible && isChecked;
             }
         }
 

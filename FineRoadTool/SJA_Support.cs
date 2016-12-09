@@ -22,27 +22,36 @@ namespace FineRoadTool
         {
             get
             {
-                if (modExists && InstanceFound())
+                try
                 {
-                    return (bool)m_anarchyEnabled.GetValue(m_instance);
+                    if (modExists && InstanceFound())
+                    {
+                        return (bool)m_anarchyEnabled.GetValue(m_instance);
+                    }
                 }
+                catch { }
+
                 return false;
             }
 
             set
             {
-                if (!modExists || !InstanceFound() || anarchyEnabled == value) return;
-
-                if (value)
+                try
                 {
-                    m_enableAnarchy.Invoke(m_instance, null);
-                }
-                else
-                {
-                    m_disableAnarchy.Invoke(m_instance, null);
-                }
+                    if (!modExists || !InstanceFound() || anarchyEnabled == value) return;
 
-                m_updateUI.Invoke(m_instance, null);
+                    if (value)
+                    {
+                        m_enableAnarchy.Invoke(m_instance, null);
+                    }
+                    else
+                    {
+                        m_disableAnarchy.Invoke(m_instance, null);
+                    }
+
+                    m_updateUI.Invoke(m_instance, null);
+                }
+                catch { }
             }
         }
 
