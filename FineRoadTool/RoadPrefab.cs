@@ -1,4 +1,8 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
+using System.Reflection;
+
+using FineRoadTool.Redirection;
 
 namespace FineRoadTool
 {
@@ -20,14 +24,17 @@ namespace FineRoadTool
         private NetInfo m_bridge;
         private NetInfo m_slope;
         private NetInfo m_tunnel;
-        private float m_maxSlope;
 
         private RoadAIWrapper m_roadAI;
         private Mode m_mode;
         private bool m_hasElevation;
+        private bool m_detoured;
 
-        private static Dictionary<NetInfo, RoadPrefab> m_roadPrefabs;
+        private Dictionary<MethodInfo, RedirectCallsState> m_redirections = new Dictionary<MethodInfo, RedirectCallsState>();
+
+        public static Dictionary<NetInfo, RoadPrefab> m_roadPrefabs;
         private static bool m_singleMode;
+        private static MethodInfo m_LinearMiddleHeight = typeof(RoadPrefab).GetMethod("LinearMiddleHeight");
 
         private RoadPrefab(NetInfo prefab)
         {
@@ -35,14 +42,25 @@ namespace FineRoadTool
 
             m_prefab = prefab;
 
-            m_maxSlope = prefab.m_maxSlope;
-
             if (m_hasElevation = m_roadAI.hasElevation)
             {
                 m_elevated = m_roadAI.elevated;
                 m_bridge = m_roadAI.bridge;
                 m_slope = m_roadAI.slope;
                 m_tunnel = m_roadAI.tunnel;
+            }
+
+            HashSet<Type> types = new HashSet<Type>();
+
+            if (m_prefab != null) types.Add(m_prefab.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
+            if (m_elevated != null) types.Add(m_elevated.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
+            if (m_bridge != null) types.Add(m_bridge.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
+            if (m_slope != null) types.Add(m_slope.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
+            if (m_tunnel != null) types.Add(m_tunnel.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
+
+            foreach (Type type in types)
+            {
+                m_redirections[type.GetMethod("LinearMiddleHeight")] = default(RedirectCallsState);
             }
         }
 
@@ -71,7 +89,7 @@ namespace FineRoadTool
                         info != prefab.roadAI.slope &&
                         info != prefab.roadAI.tunnel)
                     {
-                            info.m_followTerrain = false;
+                        info.m_followTerrain = false;
                     }
 
                     if (prefab.m_roadAI.elevated != null && !m_roadPrefabs.ContainsKey(prefab.m_roadAI.elevated))
@@ -82,6 +100,22 @@ namespace FineRoadTool
                         m_roadPrefabs.Add(prefab.m_roadAI.slope, prefab);
                     if (prefab.m_roadAI.tunnel != null && !m_roadPrefabs.ContainsKey(prefab.m_roadAI.tunnel))
                         m_roadPrefabs.Add(prefab.m_roadAI.tunnel, prefab);
+                }
+            }
+
+            for (uint i = 0; i < PrefabCollection<NetInfo>.PrefabCount(); i++)
+            {
+                NetInfo info = PrefabCollection<NetInfo>.GetPrefab(i);
+                if (info == null) continue;
+
+                if (!m_roadPrefabs.ContainsKey(info))
+                {
+                    m_roadPrefabs.Add(info, new RoadPrefab(info));
+
+                    if (info.m_flattenTerrain && !info.m_netAI.IsUnderground())
+                    {
+                        info.m_followTerrain = false;
+                    }
                 }
             }
 
@@ -108,10 +142,11 @@ namespace FineRoadTool
                     if (value)
                     {
                         prefab.mode = Mode.Single;
+                        prefab.Update(prefab.m_detoured);
                     }
                     else
                     {
-                        prefab.Restore();
+                        prefab.Restore(false);
                     }
                 }
 
@@ -124,22 +159,25 @@ namespace FineRoadTool
             return m_slope != null || m_tunnel == null;
         }
 
-        public void Restore()
+        public void Restore(bool revertDetour)
         {
             if (m_prefab == null) return;
+
+            if (m_detoured && revertDetour)
+            {
+                m_detoured = false;
+
+                foreach (KeyValuePair<MethodInfo, RedirectCallsState> current in m_redirections)
+                {
+                    RedirectionHelper.RevertRedirect(current.Key, current.Value);
+                }
+            }
 
             if (m_singleMode)
             {
                 singleMode = false;
                 return;
             }
-
-            m_prefab.m_maxSlope = m_maxSlope;
-
-            if (m_elevated != null) m_elevated.m_maxSlope = m_maxSlope;
-            if (m_bridge != null) m_bridge.m_maxSlope = m_maxSlope;
-            if (m_slope != null) m_slope.m_maxSlope = m_maxSlope;
-            if (m_tunnel != null) m_tunnel.m_maxSlope = m_maxSlope;
 
             if (m_hasElevation)
             {
@@ -159,7 +197,6 @@ namespace FineRoadTool
                 if (m_prefab == null || !m_hasElevation) return;
 
                 m_mode = value;
-                Update();
             }
         }
 
@@ -183,28 +220,31 @@ namespace FineRoadTool
             get { return m_elevated != null || m_bridge != null || m_slope != null || m_tunnel != null; }
         }
 
-        public float defaultSlope
+        public bool LinearMiddleHeight()
         {
-            get { return m_maxSlope; }
+            return true;
         }
 
-        public void SetMaxSlope(float slope)
+        public void Update(bool straightSlope)
         {
-            m_prefab.m_maxSlope = slope;
+            if (m_prefab == null) return;
 
-            if (m_elevated != null) m_elevated.m_maxSlope = slope;
-            if (m_bridge != null) m_bridge.m_maxSlope = slope;
-            if (m_slope != null) m_slope.m_maxSlope = slope;
-            if (m_tunnel != null) m_tunnel.m_maxSlope = slope;
-        }
+            Restore(!straightSlope);
 
-        public void Update()
-        {
-            if (m_prefab == null || !m_hasElevation) return;
+            if (straightSlope && !m_detoured)
+            {
+                List<MethodInfo> methods = new List<MethodInfo>(m_redirections.Keys);
+                foreach (MethodInfo from in methods)
+                {
+                    m_redirections[from] = RedirectionHelper.RedirectCalls(from, m_LinearMiddleHeight);
+                }
 
-            Restore();
+                m_detoured = true;
+            }
 
             NetSkins_Support.ForceUpdate();
+
+            if (!hasElevation) return;
 
             switch (m_mode)
             {
