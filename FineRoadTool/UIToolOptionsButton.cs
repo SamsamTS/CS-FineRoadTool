@@ -30,6 +30,8 @@ namespace FineRoadTool
         public static readonly SavedInt savedWindowX = new SavedInt("windowX", FineRoadTool.settingsFileName, -1000, true);
         public static readonly SavedInt savedWindowY = new SavedInt("windowY", FineRoadTool.settingsFileName, -1000, true);
 
+        public static readonly SavedBool windowVisible = new SavedBool("windowVisible", FineRoadTool.settingsFileName, false, true);
+
         public static UIPanel toolOptionsPanel = null;
 
         public override void Start()
@@ -38,6 +40,8 @@ namespace FineRoadTool
 
             CreateButton();
             CreateOptionPanel();
+
+            isChecked = windowVisible;
         }
 
         public override void Update()
@@ -71,6 +75,11 @@ namespace FineRoadTool
                     relativePosition = Vector2.zero;
                     parent.BringToFront();
                 }
+            }
+            else
+            {
+                isVisible = false;
+                return;
             }
 
             m_button.text = m_elevationStepLabel.text = FineRoadTool.instance.elevationStep + "m\n";

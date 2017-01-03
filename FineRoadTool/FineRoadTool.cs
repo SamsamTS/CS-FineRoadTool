@@ -24,9 +24,6 @@ namespace FineRoadTool
 
                 // Don't destroy it
                 GameObject.DontDestroyOnLoad(FineRoadTool.instance);
-
-                // Registering manager
-                SimulationManager.RegisterSimulationManager(FineRoadTool.instance);
             }
             else
             {
@@ -44,7 +41,7 @@ namespace FineRoadTool
         }
     }
 
-    public class FineRoadTool : MonoBehaviour, ISimulationManager
+    public class FineRoadTool : MonoBehaviour
     {
         public const string settingsFileName = "FineRoadTool";
 
@@ -94,15 +91,6 @@ namespace FineRoadTool
 
         private static UIToolOptionsButton m_toolOptionButton;
         private static UIButton m_upgradeButtonTemplate;
-
-        #region ISimulationManager
-        public virtual void GetData(FastList<ColossalFramework.IO.IDataContainer> data) { }
-        public virtual string GetName() { return gameObject.name; }
-        public virtual ThreadProfiler GetSimulationProfiler() { return new ThreadProfiler(); }
-        public virtual void LateUpdateData(SimulationManager.UpdateMode mode) { }
-        public virtual void UpdateData(SimulationManager.UpdateMode mode) { }
-        public virtual void EarlyUpdateData() { }
-        #endregion
 
         public Mode mode
         {
@@ -327,79 +315,93 @@ namespace FineRoadTool
             RoadPrefab.singleMode = false;
         }
 
-        public virtual void SimulationStep(int subStep)
+        public class AfterSimulationTick : ThreadingExtensionBase
         {
-            if (!enabled) return;
-
-            try
+            public override void OnAfterSimulationTick()
             {
-                // Removes HeightTooHigh error
-                if (m_buildingTool.enabled)
+                if (FineRoadTool.instance == null || !FineRoadTool.instance.enabled) return;
+
+                try
                 {
-                    ToolBase.ToolErrors errors = (ToolBase.ToolErrors)m_placementErrorsField.GetValue(m_buildingTool);
-                    if ((errors & ToolBase.ToolErrors.HeightTooHigh) == ToolBase.ToolErrors.HeightTooHigh)
-                    {
-                        errors = errors & ~ToolBase.ToolErrors.HeightTooHigh;
-                        m_placementErrorsField.SetValue(m_buildingTool, errors);
-                    }
+                    FineRoadTool.instance.OnAfterSimulationTick();
                 }
-
-                // Resume fixes
-                if (m_fixNodesCount != 0 || m_fixTunnelsCount != 0)
+                catch (Exception e)
                 {
-                    RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
-                    if (prefab != null) prefab.Restore(false);
-
-                    if (m_fixTunnelsCount != 0) FixTunnels();
-                    if (m_fixNodesCount != 0) FixNodes();
-
-                    if (prefab != null) prefab.Update(false);
+                    DebugUtils.Log("OnAfterSimulationTick failed");
+                    DebugUtils.LogException(e);
                 }
-
-                if (!isActive && !m_bulldozeTool.enabled) return;
-
-                // Check if segment have been created/deleted/updated
-                if (m_segmentCount != NetManager.instance.m_segmentCount || (bool)m_upgradingField.GetValue(m_netTool))
-                {
-                    m_segmentCount = NetManager.instance.m_segmentCount;
-
-                    RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
-                    if (prefab != null) prefab.Restore(false);
-
-                    m_fixTunnelsCount = 0;
-                    m_fixNodesCount = 0;
-
-                    FixTunnels();
-                    FixNodes();
-
-                    if (prefab != null) prefab.Update(straightSlope);
-                }
-
-                if (!isActive) return;
-
-                // Fix first control point elevation
-                int count = (int)m_controlPointCountField.GetValue(m_netTool);
-                if (count != m_controlPointCount && m_controlPointCount == 0 && count == 1)
-                {
-                    if (FixControlPoint(0))
-                    {
-                        m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_controlPoints[0].m_elevation / elevationStep) * elevationStep * 256f / 12f);
-                        UpdateElevation();
-                        if (m_toolOptionButton != null) m_toolOptionButton.UpdateInfo();
-                    }
-                }
-                // Fix last control point elevation
-                else if (count == ((m_netTool.m_mode == NetTool.Mode.Curved || m_netTool.m_mode == NetTool.Mode.Freeform) ? 2 : 1))
-                {
-                    FixControlPoint(count);
-                }
-                m_controlPointCount = count;
             }
-            catch (Exception e)
+        }
+
+        public virtual void OnAfterSimulationTick()
+        {
+            // Removes HeightTooHigh & TooShort errors
+            if (m_buildingTool.enabled)
             {
-                DebugUtils.Log("SimulationStep failed");
-                DebugUtils.LogException(e);
+                ToolBase.ToolErrors errors = (ToolBase.ToolErrors)m_placementErrorsField.GetValue(m_buildingTool);
+                if ((errors & ToolBase.ToolErrors.HeightTooHigh) == ToolBase.ToolErrors.HeightTooHigh)
+                {
+                    errors = errors & ~ToolBase.ToolErrors.HeightTooHigh;
+                    m_placementErrorsField.SetValue(m_buildingTool, errors);
+                }
+
+                if ((errors & ToolBase.ToolErrors.TooShort) == ToolBase.ToolErrors.TooShort)
+                {
+                    errors = errors & ~ToolBase.ToolErrors.TooShort;
+                    m_placementErrorsField.SetValue(m_buildingTool, errors);
+                }
             }
+
+            // Resume fixes
+            if (m_fixNodesCount != 0 || m_fixTunnelsCount != 0)
+            {
+                RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
+                if (prefab != null) prefab.Restore(false);
+
+                if (m_fixTunnelsCount != 0) FixTunnels();
+                if (m_fixNodesCount != 0) FixNodes();
+
+                if (prefab != null) prefab.Update(false);
+            }
+
+            if (!isActive && !m_bulldozeTool.enabled) return;
+
+            // Check if segment have been created/deleted/updated
+            if (m_segmentCount != NetManager.instance.m_segmentCount || (bool)m_upgradingField.GetValue(m_netTool))
+            {
+                m_segmentCount = NetManager.instance.m_segmentCount;
+
+                RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
+                if (prefab != null) prefab.Restore(false);
+
+                m_fixTunnelsCount = 0;
+                m_fixNodesCount = 0;
+
+                FixTunnels();
+                FixNodes();
+
+                if (prefab != null) prefab.Update(straightSlope);
+            }
+
+            if (!isActive) return;
+
+            // Fix first control point elevation
+            int count = (int)m_controlPointCountField.GetValue(m_netTool);
+            if (count != m_controlPointCount && m_controlPointCount == 0 && count == 1)
+            {
+                if (FixControlPoint(0))
+                {
+                    m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_controlPoints[0].m_elevation / elevationStep) * elevationStep * 256f / 12f);
+                    UpdateElevation();
+                    if (m_toolOptionButton != null) m_toolOptionButton.UpdateInfo();
+                }
+            }
+            // Fix last control point elevation
+            else if (count == ((m_netTool.m_mode == NetTool.Mode.Curved || m_netTool.m_mode == NetTool.Mode.Freeform) ? 2 : 1))
+            {
+                FixControlPoint(count);
+            }
+            m_controlPointCount = count;
         }
 
         public void OnGUI()
@@ -895,15 +897,14 @@ namespace FineRoadTool
                 // Find the visible RoadsOptionPanel
                 if (panel.component.isVisible)
                 {
-                    // Put the main button in ElevationStep
                     UIComponent button = panel.component.Find<UIComponent>("ElevationStep");
-                    if (button != null)
-                    {
-                        m_toolOptionButton.transform.SetParent(button.transform);
-                        m_buttonInOptionsBar = false;
-                        button.tooltip = null;
-                        m_buttonExists = true;
-                    }
+                    if (button == null) continue;
+
+                    // Put the main button in ElevationStep
+                    m_toolOptionButton.transform.SetParent(button.transform);
+                    m_buttonInOptionsBar = false;
+                    button.tooltip = null;
+                    m_buttonExists = true;
 
                     // Add Upgrade button if needed
                     List<NetTool.Mode> list = new List<NetTool.Mode>(panel.m_Modes);
@@ -923,18 +924,18 @@ namespace FineRoadTool
 
                     return;
                 }
-
-                // No visible RoadsOptionPanel found. Put the main button in OptionsBar instead
-                UIPanel optionBar = UIView.Find<UIPanel>("OptionsBar");
-
-                if (optionBar == null)
-                {
-                    DebugUtils.Log("OptionBar not found!");
-                    return;
-                }
-                m_toolOptionButton.transform.SetParent(optionBar.transform);
-                m_buttonInOptionsBar = true;
             }
+
+            // No visible RoadsOptionPanel found. Put the main button in OptionsBar instead
+            UIPanel optionBar = UIView.Find<UIPanel>("OptionsBar");
+
+            if (optionBar == null)
+            {
+                DebugUtils.Log("OptionBar not found!");
+                return;
+            }
+            m_toolOptionButton.transform.SetParent(optionBar.transform);
+            m_buttonInOptionsBar = true;
         }
 
         public void UpdateCatenary()

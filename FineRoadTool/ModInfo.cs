@@ -7,7 +7,7 @@ using ColossalFramework;
 using ColossalFramework.UI;
 /*using System.Linq;
 using ColossalFramework.Plugins;
-using ColossalFramework.Steamworks;*/
+using ColossalFramework.PlatformServices;*/
 
 namespace FineRoadTool
 {
@@ -70,26 +70,29 @@ namespace FineRoadTool
                 });
 
                 /*PublishedFileId SJA = new PublishedFileId(553184329);
-                if (Steam.active && Steam.workshop.GetSubscribedItems().Contains(SJA))
+                if (PlatformService.active && PlatformService.workshop.GetSubscribedItems().Contains(SJA))
                 {
-                    Steam.workshop.Unsubscribe(SJA);
+                    PlatformService.workshop.Unsubscribe(SJA);
 
                     PublishedFileId FRA = new PublishedFileId(802066100);
-                    Steam.workshop.eventWorkshopItemInstalled += (id) =>
-                    {
-                        if (id == FRA)
-                        {
-                            foreach (PluginManager.PluginInfo plugin in PluginManager.instance.GetPluginsInfo())
-                            {
-                                if (plugin.publishedFileID == FRA)
-                                {
-                                    plugin.isEnabled = true;
-                                }
-                            }
-                        }
-                    };
-                        
-                    Steam.workshop.Subscribe(FRA);
+                    Workshop.WorkshopItemInstalledHandler workshopItemInstalled = null;
+                    workshopItemInstalled = (id) =>
+                     {
+                         if (id == FRA)
+                         {
+                             foreach (PluginManager.PluginInfo plugin in PluginManager.instance.GetPluginsInfo())
+                             {
+                                 if (plugin.publishedFileID == FRA)
+                                 {
+                                     plugin.isEnabled = true;
+                                     PlatformService.workshop.eventWorkshopItemInstalled -= workshopItemInstalled;
+                                 }
+                             }
+                         }
+                     };
+
+                    PlatformService.workshop.eventWorkshopItemInstalled += workshopItemInstalled;
+                    PlatformService.workshop.Subscribe(FRA);
                 }*/
             }
             catch (Exception e)
@@ -99,6 +102,6 @@ namespace FineRoadTool
             }
         }
 
-        public const string version = "1.3.0";
+        public const string version = "1.3.1";
     }
 }
