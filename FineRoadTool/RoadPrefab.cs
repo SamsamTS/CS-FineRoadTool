@@ -174,13 +174,18 @@ namespace FineRoadTool
 
             foreach (RoadPrefab road in m_roadPrefabs.Values)
             {
-                road.prefab.m_maxTurnAngle = road.m_defaultMaxTurnAngle;
-                road.prefab.m_maxTurnAngleCos = Mathf.Cos(Mathf.Deg2Rad * road.m_defaultMaxTurnAngle);
-
-                if (road.m_defaultMaxTurnAngle > angle)
+                if ((road.prefab.m_connectGroup & (NetInfo.ConnectGroup.CenterTram | NetInfo.ConnectGroup.NarrowTram | NetInfo.ConnectGroup.SingleTram | NetInfo.ConnectGroup.WideTram)) != NetInfo.ConnectGroup.None)
                 {
-                    road.prefab.m_maxTurnAngle = angle;
-                    road.prefab.m_maxTurnAngleCos = Mathf.Cos(Mathf.Deg2Rad * angle);
+                    //DebugUtils.Log("SetMaxTurnAngle on " + road.prefab.name);
+
+                    road.prefab.m_maxTurnAngle = road.m_defaultMaxTurnAngle;
+                    road.prefab.m_maxTurnAngleCos = Mathf.Cos(Mathf.Deg2Rad * road.m_defaultMaxTurnAngle);
+
+                    if (road.m_defaultMaxTurnAngle > angle)
+                    {
+                        road.prefab.m_maxTurnAngle = angle;
+                        road.prefab.m_maxTurnAngleCos = Mathf.Cos(Mathf.Deg2Rad * angle);
+                    }
                 }
             }
         }

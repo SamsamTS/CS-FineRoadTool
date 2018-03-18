@@ -56,14 +56,14 @@ namespace FineRoadTool
 
                 group.AddSpace(10);
 
-                checkBox = (UICheckBox)group.AddCheckbox("Change max turn angle for more realistic tram track turns", FineRoadTool.changeMaxTurnAngle.value, (b) =>
+                checkBox = (UICheckBox)group.AddCheckbox("Change max turn angle for more realistic tram tracks turns", FineRoadTool.changeMaxTurnAngle.value, (b) =>
                 {
                     FineRoadTool.changeMaxTurnAngle.value = b;
 
                     if (b) RoadPrefab.SetMaxTurnAngle(FineRoadTool.maxTurnAngle);
                     else RoadPrefab.ResetMaxTurnAngle();
                 });
-                checkBox.tooltip = "Change all roads max turn angle by the value below if current value is higher";
+                checkBox.tooltip = "Change all roads with tram tracks max turn angle by the value below if current value is higher";
 
                 group.AddTextfield("Max turn angle: ", FineRoadTool.maxTurnAngle.ToString(), (f) =>{},
                     (s) =>
@@ -118,6 +118,6 @@ namespace FineRoadTool
             }
         }
 
-        public const string version = "1.3.3";
+        public const string version = "1.3.4";
     }
 }
