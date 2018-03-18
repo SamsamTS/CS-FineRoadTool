@@ -48,8 +48,8 @@ namespace FineRoadTool
         public static SavedBool reduceCatenary = new SavedBool("reduceCatenary", settingsFileName, true, true);
         public static SavedBool disableInEditor = new SavedBool("disableInEditor", settingsFileName, false, true);
 
-        public static SavedBool changeMaxTurnAngle = new SavedBool("changeMaxTurnAngle", settingsFileName, true, true);
-        public static SavedFloat maxTurnAngle = new SavedFloat("maxTurnAngle", settingsFileName, 90, true);
+        public static SavedBool changeMaxTurnAngle = new SavedBool("_changeMaxTurnAngle", settingsFileName, false, true);
+        public static SavedFloat maxTurnAngle = new SavedFloat("_maxTurnAngle", settingsFileName, 90, true);
 
         private int m_elevation = 0;
         private SavedInt m_elevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
