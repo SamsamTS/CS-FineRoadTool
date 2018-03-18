@@ -1,4 +1,6 @@
-﻿using System;
+﻿using UnityEngine;
+
+using System;
 using System.Collections.Generic;
 using System.Reflection;
 
@@ -30,6 +32,8 @@ namespace FineRoadTool
         private bool m_hasElevation;
         private bool m_detoured;
 
+        private float m_defaultMaxTurnAngle;
+
         private Dictionary<MethodInfo, RedirectCallsState> m_redirections = new Dictionary<MethodInfo, RedirectCallsState>();
 
         public static Dictionary<NetInfo, RoadPrefab> m_roadPrefabs;
@@ -52,15 +56,23 @@ namespace FineRoadTool
 
             HashSet<Type> types = new HashSet<Type>();
 
-            if (m_prefab != null) types.Add(m_prefab.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
-            if (m_elevated != null) types.Add(m_elevated.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
-            if (m_bridge != null) types.Add(m_bridge.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
-            if (m_slope != null) types.Add(m_slope.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
-            if (m_tunnel != null) types.Add(m_tunnel.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
-
-            foreach (Type type in types)
+            try
             {
-                m_redirections[type.GetMethod("LinearMiddleHeight")] = default(RedirectCallsState);
+                if (m_prefab != null) types.Add(m_prefab.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
+                if (m_elevated != null) types.Add(m_elevated.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
+                if (m_bridge != null) types.Add(m_bridge.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
+                if (m_slope != null) types.Add(m_slope.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
+                if (m_tunnel != null) types.Add(m_tunnel.m_netAI.GetType().GetMethod("LinearMiddleHeight").DeclaringType);
+
+                foreach (Type type in types)
+                {
+                    m_redirections[type.GetMethod("LinearMiddleHeight")] = default(RedirectCallsState);
+                }
+            }
+            catch(Exception e)
+            {
+                DebugUtils.Log("Getting RoadPrefab LinearMiddleHeight redirection failed: " + prefab.name);
+                DebugUtils.LogException(e);
             }
         }
 
@@ -100,6 +112,8 @@ namespace FineRoadTool
                         m_roadPrefabs.Add(prefab.m_roadAI.slope, prefab);
                     if (prefab.m_roadAI.tunnel != null && !m_roadPrefabs.ContainsKey(prefab.m_roadAI.tunnel))
                         m_roadPrefabs.Add(prefab.m_roadAI.tunnel, prefab);
+
+                    prefab.m_defaultMaxTurnAngle = info.m_maxTurnAngle;
                 }
             }
 
@@ -151,6 +165,34 @@ namespace FineRoadTool
                 }
 
                 m_singleMode = value;
+            }
+        }
+
+        public static void SetMaxTurnAngle(float angle)
+        {
+            if (m_roadPrefabs == null) return;
+
+            foreach (RoadPrefab road in m_roadPrefabs.Values)
+            {
+                road.prefab.m_maxTurnAngle = road.m_defaultMaxTurnAngle;
+                road.prefab.m_maxTurnAngleCos = Mathf.Cos(Mathf.Deg2Rad * road.m_defaultMaxTurnAngle);
+
+                if (road.m_defaultMaxTurnAngle > angle)
+                {
+                    road.prefab.m_maxTurnAngle = angle;
+                    road.prefab.m_maxTurnAngleCos = Mathf.Cos(Mathf.Deg2Rad * angle);
+                }
+            }
+        }
+
+        public static void ResetMaxTurnAngle()
+        {
+            if (m_roadPrefabs == null) return;
+
+            foreach (RoadPrefab road in m_roadPrefabs.Values)
+            {
+                    road.prefab.m_maxTurnAngle = road.m_defaultMaxTurnAngle;
+                    road.prefab.m_maxTurnAngleCos = Mathf.Cos(Mathf.Deg2Rad * road.m_defaultMaxTurnAngle);
             }
         }
 

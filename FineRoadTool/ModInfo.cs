@@ -56,6 +56,48 @@ namespace FineRoadTool
 
                 group.AddSpace(10);
 
+                checkBox = (UICheckBox)group.AddCheckbox("Change max turn angle for more realistic tram track turns", FineRoadTool.changeMaxTurnAngle.value, (b) =>
+                {
+                    FineRoadTool.changeMaxTurnAngle.value = b;
+
+                    if (b) RoadPrefab.SetMaxTurnAngle(FineRoadTool.maxTurnAngle);
+                    else RoadPrefab.ResetMaxTurnAngle();
+                });
+                checkBox.tooltip = "Change all roads max turn angle by the value below if current value is higher";
+
+                group.AddTextfield("Max turn angle: ", FineRoadTool.maxTurnAngle.ToString(), (f) =>{},
+                    (s) =>
+                    {
+                        float f = 0;
+                        float.TryParse(s, out f);
+
+                        FineRoadTool.maxTurnAngle.value = Mathf.Clamp(f, 0f, 180f);
+
+                        if (FineRoadTool.changeMaxTurnAngle.value)
+                        {
+                            RoadPrefab.SetMaxTurnAngle(FineRoadTool.maxTurnAngle.value);
+                        }
+                    });
+
+                group.AddSpace(10);
+
+                checkBox = (UICheckBox)group.AddCheckbox("Disable in editor (Recommended for road editor)", FineRoadTool.disableInEditor.value, (b) =>
+                {
+                    FineRoadTool.disableInEditor.value = b;
+                    if (FineRoadTool.instance != null)
+                    {
+                        FineRoadTool.instance.enabled = !b;
+                        if (!b)
+                        {
+                            RoadPrefab.singleMode = (ToolManager.instance.m_properties.m_mode & ItemClass.Availability.AssetEditor) != ItemClass.Availability.None;
+                        }
+                    }
+                });
+
+                checkBox.tooltip = "Disable the mod in the editor";
+
+                group.AddSpace(10);
+
                 panel.gameObject.AddComponent<OptionsKeymapping>();
 
                 group.AddSpace(10);
@@ -68,32 +110,6 @@ namespace FineRoadTool
                     if (UIToolOptionsButton.toolOptionsPanel)
                         UIToolOptionsButton.toolOptionsPanel.absolutePosition = new Vector3(-1000, -1000);
                 });
-
-                /*PublishedFileId SJA = new PublishedFileId(553184329);
-                if (PlatformService.active && PlatformService.workshop.GetSubscribedItems().Contains(SJA))
-                {
-                    PlatformService.workshop.Unsubscribe(SJA);
-
-                    PublishedFileId FRA = new PublishedFileId(802066100);
-                    Workshop.WorkshopItemInstalledHandler workshopItemInstalled = null;
-                    workshopItemInstalled = (id) =>
-                     {
-                         if (id == FRA)
-                         {
-                             foreach (PluginManager.PluginInfo plugin in PluginManager.instance.GetPluginsInfo())
-                             {
-                                 if (plugin.publishedFileID == FRA)
-                                 {
-                                     plugin.isEnabled = true;
-                                     PlatformService.workshop.eventWorkshopItemInstalled -= workshopItemInstalled;
-                                 }
-                             }
-                         }
-                     };
-
-                    PlatformService.workshop.eventWorkshopItemInstalled += workshopItemInstalled;
-                    PlatformService.workshop.Subscribe(FRA);
-                }*/
             }
             catch (Exception e)
             {
@@ -102,6 +118,6 @@ namespace FineRoadTool
             }
         }
 
-        public const string version = "1.3.1";
+        public const string version = "1.3.2";
     }
 }

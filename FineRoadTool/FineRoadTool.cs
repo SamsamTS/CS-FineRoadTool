@@ -46,6 +46,10 @@ namespace FineRoadTool
         public const string settingsFileName = "FineRoadTool";
 
         public static SavedBool reduceCatenary = new SavedBool("reduceCatenary", settingsFileName, true, true);
+        public static SavedBool disableInEditor = new SavedBool("disableInEditor", settingsFileName, false, true);
+
+        public static SavedBool changeMaxTurnAngle = new SavedBool("changeMaxTurnAngle", settingsFileName, true, true);
+        public static SavedFloat maxTurnAngle = new SavedFloat("maxTurnAngle", settingsFileName, 90, true);
 
         private int m_elevation = 0;
         private SavedInt m_elevationStep = new SavedInt("elevationStep", settingsFileName, 3, true);
@@ -91,6 +95,12 @@ namespace FineRoadTool
 
         private static UIToolOptionsButton m_toolOptionButton;
         private static UIButton m_upgradeButtonTemplate;
+
+        public bool singleMode
+        {
+            get { return RoadPrefab.singleMode; }
+            set { RoadPrefab.singleMode = value; }
+        }
 
         public Mode mode
         {
@@ -138,19 +148,9 @@ namespace FineRoadTool
             {
                 if (value != m_straightSlope)
                 {
-                    if (SJA_Support.modExists && value)
-                    {
-                        SJA_Support.anarchyEnabled = false;
-                    }
-
                     m_straightSlope = value;
 
                     m_toolOptionButton.UpdateInfo();
-
-                    if (value)
-                        DebugUtils.Log("Straight Slope enabled");
-                    else
-                        DebugUtils.Log("Straight Slope disabled");
 
                     RoadPrefab prefab = RoadPrefab.GetPrefab(m_current);
                     if (prefab == null) return;
@@ -162,7 +162,6 @@ namespace FineRoadTool
 
         public void Start()
         {
-            SJA_Support.Init();
             NetSkins_Support.Init();
 
             // Getting NetTool
@@ -242,6 +241,11 @@ namespace FineRoadTool
             m_inEditor = (ToolManager.instance.m_properties.m_mode & ItemClass.Availability.AssetEditor) != ItemClass.Availability.None;
             RoadPrefab.singleMode = m_inEditor;
 
+            if (changeMaxTurnAngle.value)
+            {
+                RoadPrefab.SetMaxTurnAngle(maxTurnAngle.value);
+            }
+
             // Update Catenary
             UpdateCatenary();
 
@@ -249,6 +253,8 @@ namespace FineRoadTool
             FixNodes();
 
             DebugUtils.Log("Initialized");
+
+            if (disableInEditor.value) enabled = false;
         }
 
         public void Update()
@@ -288,11 +294,6 @@ namespace FineRoadTool
                 else
                 {
                     RoadPrefab.singleMode = m_inEditor && !m_netTool.enabled && !m_bulldozeTool.enabled;
-                }
-
-                if (m_activated && SJA_Support.modExists && m_straightSlope && SJA_Support.anarchyEnabled)
-                {
-                    straightSlope = false;
                 }
             }
             catch (Exception e)
@@ -570,13 +571,6 @@ namespace FineRoadTool
             m_activated = true;
             m_toolOptionButton.isVisible = true;
             m_toolOptionButton.UpdateInfo();
-
-            DebugUtils.Log("Activated: " + info.name + " selected");
-
-            if (SJA_Support.modExists && m_straightSlope)
-            {
-                SJA_Support.anarchyEnabled = false;
-            }
         }
 
         private void Deactivate()
