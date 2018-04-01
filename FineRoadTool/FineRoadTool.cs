@@ -336,6 +336,8 @@ namespace FineRoadTool
 
         public virtual void OnAfterSimulationTick()
         {
+            if (m_buildingTool == null) return;
+
             // Removes HeightTooHigh & TooShort errors
             if (m_buildingTool.enabled)
             {
@@ -661,7 +663,11 @@ namespace FineRoadTool
                         nodes[i].m_flags = nodes[i].m_flags & ~NetNode.Flags.Underground;
 
                         // Updating terrain
-                        TerrainModify.UpdateArea(nodes[i].m_bounds.min.x, nodes[i].m_bounds.min.z, nodes[i].m_bounds.max.x, nodes[i].m_bounds.max.z, true, true, false);
+                        try
+                        {
+                            TerrainModify.UpdateArea(nodes[i].m_bounds.min.x, nodes[i].m_bounds.min.z, nodes[i].m_bounds.max.x, nodes[i].m_bounds.max.z, true, true, false);
+                        }
+                        catch {}
                     }
                 }
             }
