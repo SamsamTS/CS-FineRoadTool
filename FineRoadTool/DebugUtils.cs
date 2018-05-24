@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using ColossalFramework;
 using ColossalFramework.Plugins;
 
 using System;
@@ -9,20 +10,12 @@ namespace FineRoadTool
     {
         public const string modPrefix = "[Fine Road Tool " + ModInfo.version + "] ";
 
-        public static void Message(string message)
-        {
-            Log(message);
-            DebugOutputPanel.AddMessage(PluginManager.MessageType.Message, modPrefix + message);
-        }
-
-        public static void Warning(string message)
-        {
-            Debug.LogWarning(modPrefix + message);
-            DebugOutputPanel.AddMessage(PluginManager.MessageType.Warning, modPrefix + message);
-        }
+        public static SavedBool hideDebugMessages = new SavedBool("hideDebugMessages", FineRoadTool.settingsFileName, true, true);
 
         public static void Log(string message)
         {
+            if (hideDebugMessages.value) return;
+
             if (message == m_lastLog)
             {
                 m_duplicates++;
@@ -40,12 +33,22 @@ namespace FineRoadTool
             m_lastLog = message;
         }
 
+        public static void Warning(string message)
+        {
+            if (message != m_lastWarning)
+            {
+                Debug.LogWarning(modPrefix + "Warning: " + message);
+            }
+            m_lastWarning = message;
+        }
+
         public static void LogException(Exception e)
         {
-            Log("Intercepted exception (not game breaking):");
+            Debug.LogError(modPrefix + "Intercepted exception (not game breaking):");
             Debug.LogException(e);
         }
 
+        private static string m_lastWarning;
         private static string m_lastLog;
         private static int m_duplicates = 0;
     }

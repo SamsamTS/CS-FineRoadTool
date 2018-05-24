@@ -5,9 +5,6 @@ using System;
 
 using ColossalFramework;
 using ColossalFramework.UI;
-/*using System.Linq;
-using ColossalFramework.Plugins;
-using ColossalFramework.PlatformServices;*/
 
 namespace FineRoadTool
 {
@@ -22,7 +19,7 @@ namespace FineRoadTool
             }
             catch (Exception e)
             {
-                DebugUtils.Log("Could load/create the setting file.");
+                DebugUtils.Log("Couldn't load/create the setting file.");
                 DebugUtils.LogException(e);
             }
         }
@@ -44,7 +41,15 @@ namespace FineRoadTool
                 UIHelper group = helper.AddGroup(Name) as UIHelper;
                 UIPanel panel = group.self as UIPanel;
 
-                UICheckBox checkBox = (UICheckBox)group.AddCheckbox("Reduce rail catenary masts", FineRoadTool.reduceCatenary.value, (b) =>
+                UICheckBox checkBox = (UICheckBox)group.AddCheckbox("Disable debug messages logging", DebugUtils.hideDebugMessages.value, (b) =>
+                {
+                    DebugUtils.hideDebugMessages.value = b;
+                });
+                checkBox.tooltip = "If checked, debug messages won't be logged.";
+
+                group.AddSpace(10);
+
+                checkBox = (UICheckBox)group.AddCheckbox("Reduce rail catenary masts", FineRoadTool.reduceCatenary.value, (b) =>
                 {
                     FineRoadTool.reduceCatenary.value = b;
                     if (FineRoadTool.instance != null)
@@ -118,6 +123,6 @@ namespace FineRoadTool
             }
         }
 
-        public const string version = "1.3.5";
+        public const string version = "1.3.6";
     }
 }

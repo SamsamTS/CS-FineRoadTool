@@ -3,12 +3,10 @@ using UnityEngine;
 
 using System;
 using System.Diagnostics;
-using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 
 using ColossalFramework;
-using ColossalFramework.Math;
 using ColossalFramework.UI;
 
 namespace FineRoadTool
@@ -168,7 +166,7 @@ namespace FineRoadTool
             m_netTool = GameObject.FindObjectOfType<NetTool>();
             if (m_netTool == null)
             {
-                DebugUtils.Log("NetTool not found.");
+                DebugUtils.Warning("NetTool not found.");
                 enabled = false;
                 return;
             }
@@ -177,7 +175,7 @@ namespace FineRoadTool
             m_bulldozeTool = GameObject.FindObjectOfType<BulldozeTool>();
             if (m_bulldozeTool == null)
             {
-                DebugUtils.Log("BulldozeTool not found.");
+                DebugUtils.Warning("BulldozeTool not found.");
                 enabled = false;
                 return;
             }
@@ -186,7 +184,7 @@ namespace FineRoadTool
             m_buildingTool = GameObject.FindObjectOfType<BuildingTool>();
             if (m_buildingTool == null)
             {
-                DebugUtils.Log("BuildingTool not found.");
+                DebugUtils.Warning("BuildingTool not found.");
                 enabled = false;
                 return;
             }
@@ -202,7 +200,7 @@ namespace FineRoadTool
 
             if (m_elevationField == null || m_elevationUpField == null || m_elevationDownField == null || m_buildingElevationField == null || m_controlPointCountField == null || m_upgradingField == null || m_placementErrorsField == null)
             {
-                DebugUtils.Log("NetTool fields not found");
+                DebugUtils.Warning("NetTool fields not found");
                 m_netTool = null;
                 enabled = false;
                 return;
@@ -215,7 +213,7 @@ namespace FineRoadTool
             }
             catch
             {
-                DebugUtils.Log("Upgrade button template not found");
+                DebugUtils.Warning("Upgrade button template not found");
             }
 
             // Creating UI
@@ -232,7 +230,7 @@ namespace FineRoadTool
             }
             catch
             {
-                DebugUtils.Log("ControlPoints not found");
+                DebugUtils.Warning("ControlPoints not found");
             }
 
             // Init dictionary
