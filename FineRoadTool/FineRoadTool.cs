@@ -44,7 +44,6 @@ namespace FineRoadTool
         public const string settingsFileName = "FineRoadTool";
 
         public static SavedBool reduceCatenary = new SavedBool("reduceCatenary", settingsFileName, true, true);
-        public static SavedBool disableInEditor = new SavedBool("disableInEditor", settingsFileName, false, true);
 
         public static SavedBool changeMaxTurnAngle = new SavedBool("_changeMaxTurnAngle", settingsFileName, false, true);
         public static SavedFloat maxTurnAngle = new SavedFloat("_maxTurnAngle", settingsFileName, 90, true);
@@ -251,8 +250,6 @@ namespace FineRoadTool
             FixNodes();
 
             DebugUtils.Log("Initialized");
-
-            if (disableInEditor.value) enabled = false;
         }
 
         public void Update()
@@ -291,7 +288,7 @@ namespace FineRoadTool
                 }
                 else
                 {
-                    RoadPrefab.singleMode = m_inEditor && !m_netTool.enabled && !m_bulldozeTool.enabled;
+                    RoadPrefab.singleMode = m_inEditor && !UIView.HasModalInput() && !m_netTool.enabled && !m_bulldozeTool.enabled;
                 }
             }
             catch (Exception e)
@@ -424,8 +421,7 @@ namespace FineRoadTool
                             FieldInfo cachedMaxElevation = info.m_buildingAI.GetType().GetField("m_cachedMaxElevation", BindingFlags.NonPublic | BindingFlags.Instance);
                             if (cachedMaxElevation != null) cachedMaxElevation.SetValue(info.m_buildingAI, -1);
 
-                            int min, max;
-                            info.m_buildingAI.GetElevationLimits(out min, out max);
+                            info.m_buildingAI.GetElevationLimits(out int min, out int max);
 
                             int elevation = (int)m_buildingElevationField.GetValue(m_buildingTool);
                             elevation += OptionsKeymapping.elevationUp.IsPressed(Event.current) ? 1 : -1;
@@ -544,8 +540,7 @@ namespace FineRoadTool
             AttachToolOptionsButton(prefab);
 
             // Is it a valid prefab?
-            int min, max;
-            m_current.m_netAI.GetElevationLimits(out min, out max);
+            m_current.m_netAI.GetElevationLimits(out int min, out int max);
 
             if ((m_bulldozeTool.enabled || (min == 0 && max == 0)) && !m_buttonExists)
             {
@@ -612,8 +607,7 @@ namespace FineRoadTool
 
         private void UpdateElevation()
         {
-            int min, max;
-            m_current.m_netAI.GetElevationLimits(out min, out max);
+            m_current.m_netAI.GetElevationLimits(out int min, out int max);
 
             m_elevation = Mathf.Clamp(m_elevation, min * 256, max * 256);
             if (elevationStep < 3) m_elevation = Mathf.RoundToInt(Mathf.RoundToInt(m_elevation / (256f / 12f)) * (256f / 12f));

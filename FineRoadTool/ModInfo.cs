@@ -15,7 +15,10 @@ namespace FineRoadTool
             try
             {
                 // Creating setting file
-                GameSettings.AddSettingsFile(new SettingsFile[] { new SettingsFile() { fileName = FineRoadTool.settingsFileName } });
+                if(GameSettings.FindSettingsFileByName(FineRoadTool.settingsFileName) == null)
+                {
+                    GameSettings.AddSettingsFile(new SettingsFile[] { new SettingsFile() { fileName = FineRoadTool.settingsFileName } });
+                }
             }
             catch (Exception e)
             {
@@ -86,23 +89,6 @@ namespace FineRoadTool
 
                 group.AddSpace(10);
 
-                checkBox = (UICheckBox)group.AddCheckbox("Disable in editor (Recommended for road editor)", FineRoadTool.disableInEditor.value, (b) =>
-                {
-                    FineRoadTool.disableInEditor.value = b;
-                    if (FineRoadTool.instance != null)
-                    {
-                        FineRoadTool.instance.enabled = !b;
-                        if (!b)
-                        {
-                            RoadPrefab.singleMode = (ToolManager.instance.m_properties.m_mode & ItemClass.Availability.AssetEditor) != ItemClass.Availability.None;
-                        }
-                    }
-                });
-
-                checkBox.tooltip = "Disable the mod in the editor";
-
-                group.AddSpace(10);
-
                 panel.gameObject.AddComponent<OptionsKeymapping>();
 
                 group.AddSpace(10);
@@ -123,6 +109,6 @@ namespace FineRoadTool
             }
         }
 
-        public const string version = "1.3.6";
+        public const string version = "1.3.7";
     }
 }
