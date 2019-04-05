@@ -79,58 +79,45 @@ namespace FineRoadTool
                 return;
             }
 
-            m_button.text = m_elevationStepLabel.text = FineRoadTool.instance.elevationStep + "m\n";
             m_elevationStepSlider.value = FineRoadTool.instance.elevationStep;
             m_straightSlope.isChecked = FineRoadTool.instance.straightSlope;
-
-            m_button.normalFgSprite = FineRoadTool.instance.straightSlope ? "ToolbarIconGroup1Hovered" : null;
 
             switch (FineRoadTool.instance.mode)
             {
                 case Mode.Normal:
-                    m_button.text += "Nrm\n";
+                    m_button.normalFgSprite = "NormalMode";
                     m_normalModeButton.SimulateClick();
                     break;
                 case Mode.Ground:
-                    m_button.text += "Gnd\n";
+                    m_button.normalFgSprite = "GroundMode";
                     m_groundModeButton.SimulateClick();
                     break;
                 case Mode.Elevated:
-                    m_button.text += "Elv\n";
+                    m_button.normalFgSprite = "ElevatedMode";
                     m_elevatedModeButton.SimulateClick();
                     break;
                 case Mode.Bridge:
-                    m_button.text += "Bdg\n";
+                    m_button.normalFgSprite = "BridgeMode";
                     m_bridgeModeButton.SimulateClick();
                     break;
                 case Mode.Tunnel:
-                    m_button.text += "Tnl\n";
+                    m_button.normalFgSprite = "TunnelMode";
                     m_tunnelModeButton.SimulateClick();
                     break;
             }
-
-            m_button.text += FineRoadTool.instance.elevation + "m";
+            if (isChecked) m_button.normalFgSprite = m_button.normalFgSprite + "Focused";
         }
 
         private void CreateButton()
         {
             m_button = AddUIComponent<UIButton>();
-            m_button.atlas = ResourceLoader.GetAtlas("Ingame");
+            m_button.atlas = m_atlas;
             m_button.name = "FRT_MainButton";
             m_button.size = new Vector2(36, 36);
-            m_button.textScale = 0.7f;
             m_button.playAudioEvents = true;
             m_button.relativePosition = Vector2.zero;
 
-            m_button.tooltip = "Fine Road Tool " + ModInfo.version + "\n\nClick here for Tool Options";
-
-            m_button.textColor = Color.white;
-            m_button.textScale = 0.7f;
-            m_button.dropShadowOffset = new Vector2(2, -2);
-            m_button.useDropShadow = true;
-
-            m_button.textHorizontalAlignment = UIHorizontalAlignment.Center;
-            m_button.wordWrap = true;
+            m_button.tooltip = "Fine Road Tool";
 
             m_button.normalBgSprite = "OptionBase";
             m_button.hoveredBgSprite = "OptionBaseHovered";
