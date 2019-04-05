@@ -105,6 +105,7 @@ namespace FineRoadTool
                     m_tunnelModeButton.SimulateClick();
                     break;
             }
+            if (isChecked) m_button.normalFgSprite = m_button.normalFgSprite + "Focused";
         }
 
         private void CreateButton()
