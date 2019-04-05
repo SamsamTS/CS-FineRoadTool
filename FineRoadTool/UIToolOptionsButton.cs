@@ -1,4 +1,4 @@
-﻿using UnityEngine;
+using UnityEngine;
 
 using ColossalFramework;
 using ColossalFramework.UI;
@@ -122,7 +122,7 @@ namespace FineRoadTool
             m_button.playAudioEvents = true;
             m_button.relativePosition = Vector2.zero;
 
-            m_button.tooltip = "Fine Road Tool " + ModInfo.version + "\n\nClick here for Tool Options";
+            m_button.tooltip = "Fine Road Tool";
 
             m_button.textColor = Color.white;
             m_button.textScale = 0.7f;
